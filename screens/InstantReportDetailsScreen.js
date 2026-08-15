@@ -18,6 +18,8 @@ import {
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureCurrentLocation, submitReport } from '../lib/reportSubmit';
+import { useProximityOptional } from '../lib/ProximityContext';
+import { useFeedback } from '../lib/useFeedback';
 import { useTheme } from '../lib/ThemeContext';
 
 const CATEGORIES = ['Safety', 'Maintenance', 'Vandalism', 'Lost & Found', 'Other'];
@@ -35,6 +37,8 @@ export default function InstantReportDetailsScreen({
 }) {
   const insets = useSafeAreaInsets();
   const { isDark, colors } = useTheme();
+  const { reportSubmitted } = useFeedback();
+  const proximity = useProximityOptional();
 
   const [category, setCategory] = useState('Safety');
   const [severity, setSeverity] = useState('Low');
@@ -84,8 +88,10 @@ export default function InstantReportDetailsScreen({
         isAnonymous,
         latitude,
         longitude,
+        nearbyTokens: proximity?.enabled ? proximity.getNearbyTokens() : [],
       });
 
+      reportSubmitted();
       Alert.alert('Report Posted!', 'Your incident has been shared with campus safety.', [
         { text: 'Done', onPress: onSuccess },
       ]);
@@ -176,7 +182,7 @@ export default function InstantReportDetailsScreen({
 
           {/* Location */}
           <Text style={[styles.label, { color: colors.textBody }]}>Location</Text>
-          <View style={styles.locationRow}>
+          <View style={[styles.locationRow, { backgroundColor: inputBg, borderColor: colors.border }]}>
             <Ionicons name="location" size={18} color="#2563eb" />
             {locLoading ? (
               <ActivityIndicator size="small" color="#2563eb" style={{ marginLeft: 8 }} />
@@ -292,8 +298,8 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eff6ff',
     borderRadius: 12,
+    borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 16,

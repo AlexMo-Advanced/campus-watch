@@ -12,6 +12,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NOTIFICATION_TYPES } from '../lib/notifications';
 import { useNotifications } from '../lib/NotificationContext';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../lib/ThemeContext';
 
 function iconForType(type) {
@@ -41,6 +42,7 @@ function colorForType(type, colors) {
 export default function NotificationInboxPanel() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { t } = useTranslation();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
 
@@ -60,9 +62,9 @@ export default function NotificationInboxPanel() {
           )}
         </View>
         <View style={styles.inboxTriggerText}>
-          <Text style={[styles.inboxTitle, { color: colors.text }]}>Notification Inbox</Text>
+          <Text style={[styles.inboxTitle, { color: colors.text }]}>{t('notifications.inboxTitle')}</Text>
           <Text style={[styles.inboxSub, { color: colors.textSecondary }]}>
-            {unreadCount ? `${unreadCount} unread update${unreadCount !== 1 ? 's' : ''}` : 'All caught up'}
+            {unreadCount ? t('notifications.unreadCount', { count: unreadCount }) : t('notifications.allCaughtUp')}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -74,10 +76,10 @@ export default function NotificationInboxPanel() {
             <TouchableOpacity onPress={() => setOpen(false)} style={styles.closeBtn}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Inbox</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('notifications.inboxModalTitle')}</Text>
             {unreadCount > 0 ? (
               <TouchableOpacity onPress={markAllRead}>
-                <Text style={[styles.markAll, { color: colors.primary }]}>Mark all read</Text>
+                <Text style={[styles.markAll, { color: colors.primary }]}>{t('notifications.markAllRead')}</Text>
               </TouchableOpacity>
             ) : (
               <View style={{ width: 72 }} />
@@ -88,9 +90,9 @@ export default function NotificationInboxPanel() {
             {notifications.length === 0 ? (
               <View style={styles.empty}>
                 <Ionicons name="notifications-off-outline" size={48} color={colors.textMuted} />
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>No notifications yet</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('notifications.empty')}</Text>
                 <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-                  Comments, replies, alert updates, and nearby situations will appear here.
+                  {t('notifications.emptySub')}
                 </Text>
               </View>
             ) : (

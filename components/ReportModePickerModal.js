@@ -17,14 +17,19 @@ import {
 } from '../lib/reportPreferences';
 import { useReportMode } from '../lib/ReportModeContext';
 import { useFeedback } from '../lib/useFeedback';
+import { useTranslation } from 'react-i18next';
+import { useLockdown } from '../lib/LockdownContext';
 
 export default function ReportModePickerModal({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { pickerVisible, closePicker, launchReport, preference, setPreference } = useReportMode();
   const { tabPress, medium } = useFeedback();
+  const { setReportingActive } = useLockdown();
 
   const handleSelect = (mode) => {
     medium();
+    setReportingActive(true);
     launchReport(mode);
     closePicker();
     navigation.navigate('Report Incident');
@@ -39,8 +44,8 @@ export default function ReportModePickerModal({ navigation }) {
       <View style={[styles.sheetWrap, { paddingBottom: insets.bottom + 16 }]} pointerEvents="box-none">
         <Animated.View entering={FadeInDown.duration(280).springify()} style={styles.sheet}>
           <View style={styles.handle} />
-          <Text style={styles.title}>How would you like to report?</Text>
-          <Text style={styles.subtitle}>Hold the Report button anytime to switch modes</Text>
+          <Text style={styles.title}>{t('reportModePicker.title')}</Text>
+          <Text style={styles.subtitle}>{t('reportModePicker.subtitle')}</Text>
 
           <TouchableOpacity
             style={[styles.optionCard, preference === REPORT_MODE_INSTANT && styles.optionCardDefault]}
@@ -51,8 +56,8 @@ export default function ReportModePickerModal({ navigation }) {
               <Ionicons name="camera" size={24} color="#ffffff" />
             </View>
             <View style={styles.optionBody}>
-              <Text style={styles.optionTitle}>Instant Photo Report</Text>
-              <Text style={styles.optionDesc}>Snap a photo first — TikTok-style quick posting</Text>
+              <Text style={styles.optionTitle}>{t('reportModePicker.instantTitle')}</Text>
+              <Text style={styles.optionDesc}>{t('reportModePicker.instantSub')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
           </TouchableOpacity>
@@ -66,14 +71,14 @@ export default function ReportModePickerModal({ navigation }) {
               <Ionicons name="document-text" size={24} color="#ffffff" />
             </View>
             <View style={styles.optionBody}>
-              <Text style={styles.optionTitle}>Standard Incident Report</Text>
-              <Text style={styles.optionDesc}>Full form with map, details, and optional photo</Text>
+              <Text style={styles.optionTitle}>{t('report.standard')} {t('report.title')}</Text>
+              <Text style={styles.optionDesc}>{t('reportModePicker.standardSubFull')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
           </TouchableOpacity>
 
           <Animated.View entering={FadeIn.delay(120).duration(300)} style={styles.defaultSection}>
-            <Text style={styles.defaultLabel}>Default when tapping Report</Text>
+            <Text style={styles.defaultLabel}>{t('reportModePicker.defaultWhenTap')}</Text>
             <View style={styles.defaultRow}>
               <TouchableOpacity
                 style={[styles.defaultChip, preference === REPORT_MODE_INSTANT && styles.defaultChipActive]}
@@ -86,7 +91,7 @@ export default function ReportModePickerModal({ navigation }) {
                   color={preference === REPORT_MODE_INSTANT ? '#ffffff' : '#64748b'}
                 />
                 <Text style={[styles.defaultChipText, preference === REPORT_MODE_INSTANT && styles.defaultChipTextActive]}>
-                  Quick Photo
+                  {t('settings.quickPhoto')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -100,7 +105,7 @@ export default function ReportModePickerModal({ navigation }) {
                   color={preference === REPORT_MODE_STANDARD ? '#ffffff' : '#64748b'}
                 />
                 <Text style={[styles.defaultChipText, preference === REPORT_MODE_STANDARD && styles.defaultChipTextActive]}>
-                  Standard
+                  {t('settings.standard')}
                 </Text>
               </TouchableOpacity>
             </View>

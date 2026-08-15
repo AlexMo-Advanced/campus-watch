@@ -24,16 +24,35 @@ import { useTheme } from '../lib/ThemeContext';
 import { useHaptics } from '../lib/HapticsContext';
 import { useSounds } from '../lib/SoundsContext';
 import NotificationInboxPanel from '../components/NotificationInboxPanel';
+import ProximityConsentModal from '../components/ProximityConsentModal';
+import LanguagePickerModal from '../components/LanguagePickerModal';
+import { useProximity } from '../lib/ProximityContext';
+import { useLockdown } from '../lib/LockdownContext';
+import { useLanguage } from '../lib/LanguageContext';
+import { useTranslation } from 'react-i18next';
 
 export default function ProfileScreen({ navigation }) {
-  const { isDark, colors, setDarkMode, dynamicGradients, setDynamicGradients } = useTheme();
+  const { isDark, colors, setDarkMode, dynamicGradients, setDynamicGradients, themeMode, setThemeMode } = useTheme();
   const { enabled: hapticsEnabled, setEnabled: setHapticsEnabled } = useHaptics();
   const {
     effectsEnabled: soundsEnabled,
     setEffectsEnabled: setSoundsEnabled,
     notificationsEnabled: notificationSoundsEnabled,
     setNotificationsEnabled: setNotificationSoundsEnabled,
+    preview: previewSound,
   } = useSounds();
+  const {
+    enabled: proximityEnabled,
+    ready: proximityReady,
+    bleAvailable,
+    setEnabled: setProximityEnabled,
+  } = useProximity();
+  const { lockdownEnabled, setLockdownEnabled } = useLockdown();
+  const [consentVisible, setConsentVisible] = useState(false);
+  const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
+  const { t } = useTranslation();
+  const { language, languages } = useLanguage();
+  const currentLanguageLabel = t(languages.find((l) => l.code === language)?.labelKey || 'language.english');
   const { preference, setPreference } = useReportMode();
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState('');
@@ -44,6 +63,10 @@ export default function ProfileScreen({ navigation }) {
   useEffect(() => {
     loadUserProfile();
   }, []);
+
+  useEffect(() => {
+    navigation?.setOptions?.({ title: t('settings.profileCenter') });
+  }, [navigation, t, language]);
 
   const loadUserProfile = async () => {
     try {
@@ -76,7 +99,7 @@ export default function ProfileScreen({ navigation }) {
   const handlePickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'You need to allow access to your photos to change your profile picture.');
+      Alert.alert(t('settings.permissionRequired'), t('settings.photoPermission'));
       return;
     }
 
@@ -162,9 +185,9 @@ export default function ProfileScreen({ navigation }) {
       if (upsertError) throw upsertError;
 
       setAvatarUri(publicAvatarUrl);
-      Alert.alert('Success', 'Profile updated successfully!');
+      Alert.alert(t('common.success'), t('settings.profileSaved'));
     } catch (err) {
-      Alert.alert('Upload Error', err.message);
+      Alert.alert(t('settings.uploadError'), err.message);
     } finally {
       setLoading(false);
     }
@@ -172,7 +195,7 @@ export default function ProfileScreen({ navigation }) {
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) Alert.alert('Error', error.message);
+    if (error) Alert.alert(t('common.error'), error.message);
   };
 
   const checkForUpdates = () => navigation.navigate('Updates');
@@ -182,8 +205,8 @@ export default function ProfileScreen({ navigation }) {
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Text style={[styles.timeBadge, { color: colors.textSecondary }]}>
         {dynamicGradients
-          ? `${colors.timePeriodLabel} palette · shifts through the day`
-          : 'Classic light gradient · dynamic backgrounds off'}
+          ? t('settings.timeBadgeDynamic', { period: colors.timePeriodLabel })
+          : t('settings.timeBadgeClassic')}
       </Text>
         
         {/* Avatar Section */}
@@ -203,176 +226,272 @@ export default function ProfileScreen({ navigation }) {
 
         <NotificationInboxPanel />
 
-        {/* Display Name Input */}
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.textLabel }]}>Display Name</Text>
+        {/* ── ACCOUNT ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settings.account')}</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+          <View style={styles.groupRow}>
+            <View style={styles.rowInfo}>
+              <Ionicons name="person-outline" size={20} color={colors.primary} />
+              <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.displayName')}</Text>
+            </View>
+          </View>
           <TextInput
-            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.borderInput, color: colors.inputText }]}
+            style={[styles.inlineInput, { backgroundColor: colors.inputBg, borderColor: colors.borderInput, color: colors.inputText }]}
             value={displayName}
             onChangeText={setDisplayName}
-            placeholder="Enter your name"
+            placeholder={t('settings.enterYourName')}
             placeholderTextColor={colors.textMuted}
           />
         </View>
 
-        {/* Preferences Toggle */}
-        <View style={[styles.sectionRow, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
-          <View style={styles.rowInfo}>
-            <Ionicons name={isDark ? "moon" : "sunny"} size={22} color={isDark ? "#facc15" : colors.primary} />
-            <Text style={[styles.rowLabel, { color: colors.text }]}>Dark Mode</Text>
-          </View>
-          <Switch value={isDark} onValueChange={setDarkMode} />
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile} disabled={loading}>
+          {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.saveBtnText}>{t('settings.saveProfile')}</Text>}
+        </TouchableOpacity>
+
+        {/* ── APP LANGUAGE ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('language.title')}</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+          <TouchableOpacity style={styles.groupRow} onPress={() => setLanguagePickerVisible(true)} activeOpacity={0.7}>
+            <View style={[styles.rowInfo, styles.rowInfoFlex]}>
+              <Ionicons name="language-outline" size={20} color={colors.primary} />
+              <View style={styles.rowTextFlex}>
+                <Text style={[styles.rowLabel, { color: colors.text }]}>{t('language.title')}</Text>
+                <Text style={[styles.rowSub, { color: colors.textSecondary }]}>{currentLanguageLabel}</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
         </View>
 
-        <View style={[styles.sectionRow, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
-          <View style={[styles.rowInfo, styles.rowInfoFlex]}>
-            <Ionicons name="color-palette-outline" size={22} color={colors.primary} />
-            <View style={styles.rowTextFlex}>
-              <Text style={[styles.rowLabel, { color: colors.text }]} numberOfLines={1}>
-                Dynamic Background
-              </Text>
-              <Text style={[styles.reportPrefSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                {dynamicGradients ? 'Time-of-day gradients' : 'Classic static gradient'}
-              </Text>
+        {/* ── APPEARANCE ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settings.appearance')}</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+          <View style={styles.groupRow}>
+            <View style={styles.rowInfo}>
+              <Ionicons name={isDark ? 'moon' : 'sunny'} size={20} color={isDark ? '#facc15' : colors.primary} />
+              <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.theme')}</Text>
             </View>
           </View>
-          <Switch value={dynamicGradients} onValueChange={setDynamicGradients} />
+          <View style={styles.themePicker}>
+            {[
+              { id: 'light', labelKey: 'settings.themeLight', icon: 'sunny' },
+              { id: 'system', labelKey: 'settings.themeSystem', icon: 'phone-portrait-outline' },
+              { id: 'dark', labelKey: 'settings.themeDark', icon: 'moon' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.id}
+                style={[styles.themeChip, { borderColor: colors.borderInput, backgroundColor: colors.inputBg }, themeMode === opt.id && styles.themeChipActive]}
+                onPress={() => setThemeMode(opt.id)}
+              >
+                <Ionicons name={opt.icon} size={16} color={themeMode === opt.id ? '#fff' : colors.textSecondary} />
+                <Text style={[styles.themeChipText, { color: colors.textSecondary }, themeMode === opt.id && { color: '#fff' }]}>{t(opt.labelKey)}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.groupDivider} />
+          <View style={styles.groupRow}>
+            <View style={[styles.rowInfo, styles.rowInfoFlex]}>
+              <Ionicons name="color-palette-outline" size={20} color={colors.primary} />
+              <View style={styles.rowTextFlex}>
+                <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.dynamicBackground')}</Text>
+                <Text style={[styles.rowSub, { color: colors.textSecondary }]}>{dynamicGradients ? t('settings.dynamicOn') : t('settings.dynamicOff')}</Text>
+              </View>
+            </View>
+            <Switch value={dynamicGradients} onValueChange={setDynamicGradients} />
+          </View>
         </View>
 
-        <View style={[styles.sectionRow, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
-          <View style={[styles.rowInfo, styles.rowInfoFlex]}>
-            <Ionicons name="phone-portrait-outline" size={22} color={colors.primary} />
-            <View style={styles.rowTextFlex}>
-              <Text style={[styles.rowLabel, { color: colors.text }]} numberOfLines={1}>
-                Haptic Feedback
-              </Text>
-              <Text style={[styles.reportPrefSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                {hapticsEnabled ? 'Taps, nav bar & AI' : 'Vibration off'}
-              </Text>
+        {/* ── SOUND & HAPTICS ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settings.soundHaptics')}</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+          <View style={styles.groupRow}>
+            <View style={[styles.rowInfo, styles.rowInfoFlex]}>
+              <Ionicons name="phone-portrait-outline" size={20} color={colors.primary} />
+              <View style={styles.rowTextFlex}>
+                <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.hapticFeedback')}</Text>
+                <Text style={[styles.rowSub, { color: colors.textSecondary }]}>{hapticsEnabled ? t('settings.hapticsOn') : t('settings.hapticsOff')}</Text>
+              </View>
             </View>
+            <Switch value={hapticsEnabled} onValueChange={setHapticsEnabled} />
           </View>
-          <Switch value={hapticsEnabled} onValueChange={setHapticsEnabled} />
+          <View style={styles.groupDivider} />
+          <View style={styles.groupRow}>
+            <View style={[styles.rowInfo, styles.rowInfoFlex]}>
+              <Ionicons name="volume-medium-outline" size={20} color={colors.primary} />
+              <View style={styles.rowTextFlex}>
+                <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.appSounds')}</Text>
+                <Text style={[styles.rowSub, { color: colors.textSecondary }]}>{soundsEnabled ? t('settings.appSoundsOn') : t('settings.appSoundsOff')}</Text>
+              </View>
+            </View>
+            <Switch value={soundsEnabled} onValueChange={setSoundsEnabled} />
+          </View>
+          {soundsEnabled && (
+            <>
+              <View style={styles.groupDivider} />
+              <TouchableOpacity style={styles.groupRow} onPress={() => previewSound('tap')} activeOpacity={0.7}>
+                <View style={styles.rowInfo}>
+                  <Ionicons name="play-circle-outline" size={20} color={colors.primary} />
+                  <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.testSound')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            </>
+          )}
+          <View style={styles.groupDivider} />
+          <View style={styles.groupRow}>
+            <View style={[styles.rowInfo, styles.rowInfoFlex]}>
+              <Ionicons name="notifications-outline" size={20} color={colors.primary} />
+              <View style={styles.rowTextFlex}>
+                <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.notificationSounds')}</Text>
+                <Text style={[styles.rowSub, { color: colors.textSecondary }]}>{notificationSoundsEnabled ? t('settings.notificationSoundsOn') : t('settings.notificationSoundsSilent')}</Text>
+              </View>
+            </View>
+            <Switch value={notificationSoundsEnabled} onValueChange={setNotificationSoundsEnabled} />
+          </View>
         </View>
 
-        <View style={[styles.sectionRow, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
-          <View style={[styles.rowInfo, styles.rowInfoFlex]}>
-            <Ionicons name="volume-medium-outline" size={22} color={colors.primary} />
-            <View style={styles.rowTextFlex}>
-              <Text style={[styles.rowLabel, { color: colors.text }]} numberOfLines={1}>
-                Sound Effects
-              </Text>
-              <Text style={[styles.reportPrefSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                {soundsEnabled ? 'Taps, likes & sends' : 'Interaction sounds off'}
-              </Text>
+        {/* ── NEARBY ALERTS (PRIVACY-FIRST) ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settings.nearbyAlerts')}</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+          <View style={styles.groupRow}>
+            <View style={[styles.rowInfo, styles.rowInfoFlex]}>
+              <Ionicons name="radio-outline" size={20} color={colors.primary} />
+              <View style={styles.rowTextFlex}>
+                <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.proximityToggle')}</Text>
+                <Text style={[styles.rowSub, { color: colors.textSecondary }]}>
+                  {proximityEnabled ? t('settings.proximityOn') : t('settings.proximityOff')}
+                </Text>
+              </View>
             </View>
+            <Switch
+              value={proximityEnabled}
+              disabled={!proximityReady}
+              onValueChange={(value) => {
+                if (value) {
+                  setConsentVisible(true);
+                } else {
+                  setProximityEnabled(false);
+                }
+              }}
+            />
           </View>
-          <Switch value={soundsEnabled} onValueChange={setSoundsEnabled} />
+          {proximityEnabled && !bleAvailable && (
+            <Text style={[styles.reportPrefHint, { color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 12 }]}>
+              {t('settings.proximityBleHint')}
+            </Text>
+          )}
+          <View style={styles.groupDivider} />
+          <View style={styles.groupRow}>
+            <View style={[styles.rowInfo, styles.rowInfoFlex]}>
+              <Ionicons name="alert-circle-outline" size={20} color="#ef4444" />
+              <View style={styles.rowTextFlex}>
+                <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.lockdownToggle')}</Text>
+                <Text style={[styles.rowSub, { color: colors.textSecondary }]}>
+                  {lockdownEnabled ? t('settings.lockdownOn') : t('settings.lockdownOff')}
+                </Text>
+              </View>
+            </View>
+            <Switch value={lockdownEnabled} onValueChange={setLockdownEnabled} />
+          </View>
         </View>
 
-        <View style={[styles.sectionRow, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
-          <View style={[styles.rowInfo, styles.rowInfoFlex]}>
-            <Ionicons name="notifications-outline" size={22} color={colors.primary} />
-            <View style={styles.rowTextFlex}>
-              <Text style={[styles.rowLabel, { color: colors.text }]} numberOfLines={1}>
-                Notification Sounds
-              </Text>
-              <Text style={[styles.reportPrefSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                {notificationSoundsEnabled ? 'Alerts, comments & likes' : 'Silent notifications'}
-              </Text>
+        {/* ── REPORTING ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settings.reporting')}</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+          <View style={styles.groupRow}>
+            <View style={[styles.rowInfo, styles.rowInfoFlex]}>
+              <Ionicons name="camera-outline" size={20} color={colors.primary} />
+              <View style={styles.rowTextFlex}>
+                <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.defaultReportMode')}</Text>
+                <Text style={[styles.rowSub, { color: colors.textSecondary }]}>{t('settings.defaultReportHint')}</Text>
+              </View>
             </View>
           </View>
-          <Switch value={notificationSoundsEnabled} onValueChange={setNotificationSoundsEnabled} />
-        </View>
-
-        {/* Default Report Mode */}
-        <View style={[styles.reportPrefSection, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
-          <View style={styles.reportPrefHeader}>
-            <Ionicons name="camera-outline" size={22} color={colors.primary} />
-            <View style={styles.reportPrefHeaderText}>
-              <Text style={[styles.rowLabel, { color: colors.text }]}>Default Report Mode</Text>
-              <Text style={[styles.reportPrefSub, { color: colors.textSecondary }]}>
-                Opens when you tap Report on the nav bar
-              </Text>
-            </View>
-          </View>
-          <View style={styles.reportPrefRow}>
+          <View style={[styles.reportPrefRow, { paddingHorizontal: 16, paddingBottom: 14 }]}>
             <TouchableOpacity
               style={[styles.reportPrefChip, preference === REPORT_MODE_INSTANT && styles.reportPrefChipActive]}
               onPress={() => setPreference(REPORT_MODE_INSTANT)}
             >
-              <Ionicons name="camera" size={16} color={preference === REPORT_MODE_INSTANT ? '#ffffff' : colors.primary} />
-              <Text style={[styles.reportPrefChipText, preference === REPORT_MODE_INSTANT && styles.reportPrefChipTextActive]}>
-                Quick Photo
-              </Text>
+              <Ionicons name="camera" size={16} color={preference === REPORT_MODE_INSTANT ? '#fff' : colors.primary} />
+              <Text style={[styles.reportPrefChipText, preference === REPORT_MODE_INSTANT && styles.reportPrefChipTextActive]}>{t('settings.quickPhoto')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.reportPrefChip, preference === REPORT_MODE_STANDARD && styles.reportPrefChipActive]}
               onPress={() => setPreference(REPORT_MODE_STANDARD)}
             >
-              <Ionicons name="document-text-outline" size={16} color={preference === REPORT_MODE_STANDARD ? '#ffffff' : colors.textSecondary} />
-              <Text style={[styles.reportPrefChipText, preference === REPORT_MODE_STANDARD && styles.reportPrefChipTextActive]}>
-                Standard
-              </Text>
+              <Ionicons name="document-text-outline" size={16} color={preference === REPORT_MODE_STANDARD ? '#fff' : colors.textSecondary} />
+              <Text style={[styles.reportPrefChipText, preference === REPORT_MODE_STANDARD && styles.reportPrefChipTextActive]}>{t('settings.standard')}</Text>
             </TouchableOpacity>
           </View>
-          <Text style={[styles.reportPrefHint, { color: colors.textMuted }]}>
-            Tip: Hold the Report button to pick a mode without changing your default
+          <Text style={[styles.reportPrefHint, { color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 12 }]}>
+            {t('settings.reportModeTip')}
           </Text>
         </View>
 
-        {/* Archived Alerts */}
-        <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.textLabel }]}>Archived Alerts ({archivedReports.length})</Text>
+        {/* ── MY REPORTS ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settings.myReports')}</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
           {archivedReports.length === 0 ? (
-            <Text style={[styles.noArchivedText, { color: colors.textSecondary }]}>No archived alerts found.</Text>
+            <View style={[styles.groupRow, { justifyContent: 'center' }]}>
+              <Text style={[styles.rowSub, { color: colors.textMuted, fontStyle: 'italic' }]}>{t('settings.noArchived')}</Text>
+            </View>
           ) : (
-            archivedReports.map(report => (
-              <View key={report.id} style={[styles.archivedCard, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
-                <View style={styles.archivedHeader}>
-                  <Text style={[styles.archivedTitle, { color: colors.text }]}>{report.title}</Text>
-                  <Text style={[styles.archivedDate, { color: colors.textSecondary }]}>{new Date(report.created_at).toLocaleDateString()}</Text>
+            archivedReports.map((report, i) => (
+              <View key={report.id}>
+                {i > 0 && <View style={styles.groupDivider} />}
+                <View style={[styles.groupRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 4 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
+                    <Text style={[styles.rowLabel, { color: colors.text, flex: 1 }]}>{report.title}</Text>
+                    <Text style={[styles.rowSub, { color: colors.textSecondary }]}>{new Date(report.created_at).toLocaleDateString()}</Text>
+                  </View>
+                  <Text style={[styles.rowSub, { color: colors.textBody }]} numberOfLines={2}>{report.description}</Text>
                 </View>
-                <Text style={[styles.archivedDesc, { color: colors.textBody }]} numberOfLines={2}>{report.description}</Text>
               </View>
             ))
           )}
         </View>
 
-        {/* Action Buttons */}
-        <TouchableOpacity
-          style={styles.saveBtn}
-          onPress={handleSaveProfile}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.saveBtnText}>Save Changes</Text>
-          )}
-        </TouchableOpacity>
+        {/* ── APP ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settings.app')}</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+          <TouchableOpacity style={styles.groupRow} onPress={checkForUpdates}>
+            <View style={styles.rowInfo}>
+              <Ionicons name="cloud-download-outline" size={20} color={colors.primary} />
+              <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.checkUpdates')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
 
-        {/* Check for Updates */}
-        <TouchableOpacity
-          style={styles.updateBtn}
-          onPress={checkForUpdates}
-        >
-          <Ionicons name="cloud-download-outline" size={18} color="#2563eb" />
-          <Text style={styles.updateBtnText}>Check for Updates</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
-          <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
+        {/* ── ACCOUNT ACTIONS ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settings.accountActions')}</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+          <TouchableOpacity style={styles.groupRow} onPress={handleSignOut}>
+            <View style={styles.rowInfo}>
+              <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+              <Text style={[styles.rowLabel, { color: '#ef4444' }]}>{t('settings.signOut')}</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* Build Information */}
         <View style={styles.buildInfo}>
-          <Text style={[styles.buildPowered, { color: colors.textMuted }]}>Powered by StephenOS, in collaboration with Park Fellas.</Text>
-          <Text style={[styles.buildVersion, { color: colors.textMuted }]}>Version 1.0.0</Text>
-          <Text style={[styles.buildCopy, { color: colors.textMuted }]}>StephenOS Technologies 2026 ©</Text>
+          <Text style={[styles.buildPowered, { color: colors.textMuted }]}>{t('settings.poweredBy')}</Text>
+          <Text style={[styles.buildVersion, { color: colors.textMuted }]}>{t('settings.version')}</Text>
+          <Text style={[styles.buildCopy, { color: colors.textMuted }]}>{t('settings.copyright')}</Text>
         </View>
 
     </ScrollView>
+
+    <ProximityConsentModal
+      visible={consentVisible}
+      onAccept={() => {
+        setConsentVisible(false);
+        setProximityEnabled(true);
+      }}
+      onDecline={() => setConsentVisible(false)}
+    />
+    <LanguagePickerModal visible={languagePickerVisible} onClose={() => setLanguagePickerVisible(false)} />
     </LinearGradient>
   );
 }
@@ -380,120 +499,41 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
-  content: { padding: 24, alignItems: 'center' },
+  content: { padding: 20, alignItems: 'center' },
   timeBadge: { fontSize: 11, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   avatarWrapper: { position: 'relative', marginBottom: 12, marginTop: 10 },
   avatarImage: { width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: '#2563eb' },
-  avatarPlaceholder: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cameraBadge: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    backgroundColor: '#2563eb',
-    padding: 8,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#ffffff',
-  },
-  emailText: { fontSize: 14, fontWeight: '500', marginBottom: 24 },
-  section: { width: '100%', marginBottom: 18 },
-  label: { fontSize: 13, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase' },
-  input: {
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    fontSize: 15,
-  },
-  sectionRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginVertical: 12,
-  },
+  avatarPlaceholder: { width: 110, height: 110, borderRadius: 55, justifyContent: 'center', alignItems: 'center' },
+  cameraBadge: { position: 'absolute', bottom: 2, right: 2, backgroundColor: '#2563eb', padding: 8, borderRadius: 20, borderWidth: 2, borderColor: '#ffffff' },
+  emailText: { fontSize: 14, fontWeight: '500', marginBottom: 20 },
+  // Section titles
+  sectionTitle: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginTop: 20, marginLeft: 4 },
+  // Grouped card
+  settingsGroup: { width: '100%', borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: 4 },
+  groupRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  groupDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#e2e8f0', marginLeft: 16 },
+  inlineInput: { marginHorizontal: 16, marginBottom: 14, padding: 12, borderRadius: 10, borderWidth: 1, fontSize: 15 },
   rowInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowInfoFlex: { flex: 1, minWidth: 0, marginRight: 8 },
   rowTextFlex: { flex: 1, minWidth: 0 },
   rowLabel: { fontSize: 15, fontWeight: '600' },
-  reportPrefSection: {
-    width: '100%',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginVertical: 12,
-  },
-  reportPrefHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 },
-  reportPrefHeaderText: { flex: 1 },
-  reportPrefSub: { fontSize: 12, marginTop: 2, lineHeight: 16 },
+  rowSub: { fontSize: 12, marginTop: 2, lineHeight: 16 },
+  // Report mode chips
   reportPrefRow: { flexDirection: 'row', gap: 8 },
-  reportPrefChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
-  },
+  reportPrefChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
   reportPrefChipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
   reportPrefChipText: { fontSize: 13, fontWeight: '700', color: '#64748b' },
   reportPrefChipTextActive: { color: '#ffffff' },
-  reportPrefHint: { fontSize: 11, marginTop: 10, lineHeight: 15, fontStyle: 'italic' },
-  saveBtn: {
-    width: '100%',
-    backgroundColor: '#2563eb',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 16,
-  },
+  reportPrefHint: { fontSize: 11, lineHeight: 15, fontStyle: 'italic' },
+  themePicker: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 14 },
+  themeChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5 },
+  themeChipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
+  themeChipText: { fontSize: 12, fontWeight: '700' },
+  // Save button
+  saveBtn: { width: '100%', backgroundColor: '#2563eb', padding: 15, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 15 },
-  signOutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 24,
-    padding: 12,
-  },
-  signOutText: { color: '#ef4444', fontWeight: '700', fontSize: 15 },
-  updateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    width: '100%',
-    marginTop: 12,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#2563eb',
-    backgroundColor: '#eff6ff',
-  },
-  updateBtnText: { color: '#2563eb', fontWeight: '700', fontSize: 15 },
-  noArchivedText: { fontSize: 14, fontStyle: 'italic', marginTop: 4 },
-  archivedCard: { padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
-  archivedHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  archivedTitle: { fontSize: 15, fontWeight: '700', flex: 1 },
-  archivedDate: { fontSize: 12, marginLeft: 8 },
-  archivedDesc: { fontSize: 13, lineHeight: 18 },
-  buildInfo: {
-    alignItems: 'center',
-    marginTop: 32,
-    marginBottom: 16,
-    gap: 4,
-  },
+  // Build info
+  buildInfo: { alignItems: 'center', marginTop: 32, marginBottom: 16, gap: 4 },
   buildPowered: { fontSize: 11, fontWeight: '500', textAlign: 'center' },
   buildVersion: { fontSize: 11, textAlign: 'center' },
   buildCopy: { fontSize: 11, textAlign: 'center' },

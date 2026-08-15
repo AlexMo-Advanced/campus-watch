@@ -32,9 +32,11 @@ import { useAppTheme } from '../hooks/useAppTheme';
 import { useTheme } from '../lib/ThemeContext';
 import { getSeverityGradient } from '../lib/theme';
 import { useNetwork } from '../lib/NetworkContext';
+import { useTranslation } from 'react-i18next';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { onScroll, scrollEventThrottle } = useTabBarScrollHandler();
   const { notifySelfAction, checkNearbyReports } = useNotifications();
   const tabBarPadding = getTabBarClearance(insets);
@@ -369,9 +371,9 @@ export default function HomeScreen() {
 
           <View style={styles.cardFooterRow}>
             <Text style={styles.cardFooter}>
-              {item.is_anonymous ? 'Submitted Anonymously' : 'Verified Post'}
+              {item.is_anonymous ? t('feed.submittedAnonymously') : t('feed.verifiedPost')}
             </Text>
-            <Text style={styles.tapToExpandText}>Hold for options →</Text>
+            <Text style={styles.tapToExpandText}>{t('feed.holdForOptions')}</Text>
           </View>
         </View>
         </LinearGradient>
@@ -393,7 +395,7 @@ export default function HomeScreen() {
       {!isOnline && (
         <View style={styles.offlineBar}>
           <Ionicons name="cloud-offline-outline" size={14} color="#fff" />
-          <Text style={styles.offlineBarText}>Showing cached data — offline</Text>
+          <Text style={styles.offlineBarText}>{t('feed.offlineCached')}</Text>
         </View>
       )}
       <View style={styles.filterSection}>
@@ -402,14 +404,14 @@ export default function HomeScreen() {
             style={[styles.filterChip, postedByMe && styles.filterChipActive]} 
             onPress={() => setPostedByMe(!postedByMe)}>
             <Ionicons name="person" size={14} color={postedByMe ? "#fff" : colors.icon} />
-            <Text style={[styles.filterChipText, postedByMe && styles.filterChipTextActive]}>Posted by Me</Text>
+            <Text style={[styles.filterChipText, postedByMe && styles.filterChipTextActive]}>{t('feed.postedByMe')}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={[styles.filterChip, timeFilter === '24h' && styles.filterChipActive]} 
             onPress={() => setTimeFilter(timeFilter === '24h' ? 'All Time' : '24h')}>
             <Ionicons name="time" size={14} color={timeFilter === '24h' ? "#fff" : colors.icon} />
-            <Text style={[styles.filterChipText, timeFilter === '24h' && styles.filterChipTextActive]}>Last 24h</Text>
+            <Text style={[styles.filterChipText, timeFilter === '24h' && styles.filterChipTextActive]}>{t('feed.last24h')}</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -435,14 +437,14 @@ export default function HomeScreen() {
               onPress={() => setFeedMode('Active')}
             >
               <Ionicons name="radio-button-on" size={14} color={feedMode === 'Active' ? '#fff' : colors.textSub} />
-              <Text style={[styles.feedModeBtnText, feedMode === 'Active' && styles.feedModeBtnTextActive]}>Active</Text>
+              <Text style={[styles.feedModeBtnText, feedMode === 'Active' && styles.feedModeBtnTextActive]}>{t('feed.active')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.feedModeBtn, feedMode === 'Archive' && styles.feedModeBtnActive, feedMode === 'Archive' && styles.feedModeBtnArchiveActive]}
               onPress={() => setFeedMode('Archive')}
             >
               <Ionicons name="archive" size={14} color={feedMode === 'Archive' ? '#fff' : colors.textSub} />
-              <Text style={[styles.feedModeBtnText, feedMode === 'Archive' && styles.feedModeBtnTextActive]}>Archive</Text>
+              <Text style={[styles.feedModeBtnText, feedMode === 'Archive' && styles.feedModeBtnTextActive]}>{t('feed.archive')}</Text>
             </TouchableOpacity>
           </View>
         </View>

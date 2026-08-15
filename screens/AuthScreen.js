@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 // TouchableWithoutFeedback doesn't play well with RN Web — it ends up
 // capturing pointer events meant for children (inputs, buttons), so on
@@ -26,6 +27,7 @@ const wrapperProps = Platform.OS === 'web' ? {} : { onPress: Keyboard.dismiss };
 
 export default function AuthScreen({ onLoginSuccess }) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,7 +35,7 @@ export default function AuthScreen({ onLoginSuccess }) {
 
   const handleAuth = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing Fields', 'Please enter both an email and password.');
+      Alert.alert(t('auth.missingFields'), t('auth.enterEmailPassword'));
       return;
     }
 
@@ -49,13 +51,10 @@ export default function AuthScreen({ onLoginSuccess }) {
         if (error) throw error;
 
         if (data?.session) {
-          Alert.alert('Success', 'Account created and signed in!');
+          Alert.alert(t('common.success'), t('auth.accountCreated'));
           if (onLoginSuccess) onLoginSuccess();
         } else {
-          Alert.alert(
-            'Check your Inbox',
-            'We sent a confirmation link to your email. Click it to finish signing up!'
-          );
+          Alert.alert(t('auth.checkInbox'), t('auth.confirmationSent'));
         }
       } else {
         // Sign in existing account
@@ -68,7 +67,7 @@ export default function AuthScreen({ onLoginSuccess }) {
         if (onLoginSuccess) onLoginSuccess();
       }
     } catch (error) {
-      Alert.alert('Authentication Error', error.message);
+      Alert.alert(t('auth.authError'), error.message);
     } finally {
       setLoading(false);
     }
@@ -84,18 +83,16 @@ export default function AuthScreen({ onLoginSuccess }) {
         <View style={styles.inner}>
           <View style={styles.card}>
             <Ionicons name="shield-checkmark" size={52} color="#2563eb" style={styles.icon} />
-            <Text style={styles.title}>CampusWatch</Text>
+            <Text style={styles.title}>{t('auth.campusWatch')}</Text>
             <Text style={styles.subtitle}>
-              {isSignUp
-                ? 'Create an account to submit & view reports'
-                : 'Sign in to access your campus feed'}
+              {isSignUp ? t('auth.signUpSubtitle') : t('auth.signInSubtitle')}
             </Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address</Text>
+              <Text style={styles.label}>{t('auth.emailAddress')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="student@school.edu"
+                placeholder={t('auth.emailPlaceholder')}
                 placeholderTextColor="#94a3b8"
                 value={email}
                 onChangeText={setEmail}
@@ -106,7 +103,7 @@ export default function AuthScreen({ onLoginSuccess }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={styles.label}>{t('auth.password')}</Text>
               <TextInput
                 style={styles.input}
                 placeholder="••••••••"
@@ -127,7 +124,7 @@ export default function AuthScreen({ onLoginSuccess }) {
                 <ActivityIndicator color="#ffffff" />
               ) : (
                 <Text style={styles.primaryBtnText}>
-                  {isSignUp ? 'Create Account' : 'Sign In'}
+                  {isSignUp ? t('auth.createAccount') : t('auth.signIn')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -138,9 +135,7 @@ export default function AuthScreen({ onLoginSuccess }) {
               disabled={loading}
             >
               <Text style={styles.toggleText}>
-                {isSignUp
-                  ? 'Already have an account? Sign In'
-                  : "Don't have an account? Sign Up"}
+                {isSignUp ? t('auth.toggleSignIn') : t('auth.noAccount')}
               </Text>
             </TouchableOpacity>
           </View>

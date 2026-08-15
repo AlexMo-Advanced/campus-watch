@@ -72,6 +72,15 @@ const PRESETS = {
   error: () => sequence([tone(220, 110, { volume: 0.32 }), silence(15), tone(180, 130, { volume: 0.3 })]),
   like: () => sequence([tone(880, 35, { volume: 0.2 }), silence(8), tone(1175, 55, { volume: 0.28 })]),
   send: () => sequence([tone(980, 30, { volume: 0.18 }), silence(6), tone(1240, 45, { volume: 0.24 })]),
+  report_submitted: () => sequence([
+    tone(523, 70, { volume: 0.28 }),
+    silence(18),
+    tone(659, 70, { volume: 0.3 }),
+    silence(18),
+    tone(784, 95, { volume: 0.34 }),
+    silence(30),
+    tone(988, 120, { volume: 0.32 }),
+  ]),
   alert: () => sequence([
     tone(880, 90, { volume: 0.34 }),
     silence(40),

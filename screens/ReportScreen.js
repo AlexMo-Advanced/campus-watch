@@ -7,12 +7,14 @@ import {
 } from '../lib/reportPreferences';
 import { useReportMode } from '../lib/ReportModeContext';
 import { useTabBarHiddenLock } from '../lib/TabBarScrollContext';
+import { useLockdown } from '../lib/LockdownContext';
 import InstantReportCameraScreen from './InstantReportCameraScreen';
 import InstantReportDetailsScreen from './InstantReportDetailsScreen';
 import StandardReportScreen from './StandardReportScreen';
 
 export default function ReportScreen({ navigation }) {
   const { preference, consumeLaunchMode, ready } = useReportMode();
+  const { setReportingActive } = useLockdown();
   const [mode, setMode] = useState(REPORT_MODE_STANDARD);
   const [instantStep, setInstantStep] = useState('camera');
   const [photoUri, setPhotoUri] = useState(null);
@@ -20,6 +22,13 @@ export default function ReportScreen({ navigation }) {
   const isFocused = useIsFocused();
 
   useTabBarHiddenLock(isFocused && mode === REPORT_MODE_INSTANT);
+
+  useFocusEffect(
+    useCallback(() => {
+      setReportingActive(true);
+      return () => setReportingActive(false);
+    }, [setReportingActive])
+  );
 
   useFocusEffect(
     useCallback(() => {

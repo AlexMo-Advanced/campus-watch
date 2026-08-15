@@ -3,9 +3,11 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetwork } from '../lib/NetworkContext';
+import { useTranslation } from 'react-i18next';
 
 export default function OfflineBanner() {
   const { isOnline, wasOffline } = useNetwork();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(-80)).current;
   const prevOnline = useRef(true);
@@ -54,7 +56,7 @@ export default function OfflineBanner() {
         color="#fff"
       />
       <Text style={styles.text}>
-        {isBackOnline ? 'Back online' : 'No internet connection'}
+        {isBackOnline ? t('offline.backOnline') : t('offline.noConnection')}
       </Text>
     </Animated.View>
   );

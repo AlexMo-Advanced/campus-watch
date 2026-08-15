@@ -15,11 +15,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTabBarClearance } from '../lib/tabBarLayout';
 import { TabBarScrollProvider, useTabBarScrollControls } from '../lib/TabBarScrollContext';
 import { ThemeProvider, useTheme } from '../lib/ThemeContext';
+import { LanguageProvider } from '../lib/LanguageContext';
 import { HapticsProvider } from '../lib/HapticsContext';
+import { ProximityProvider } from '../lib/ProximityContext';
 import { SoundsProvider } from '../lib/SoundsContext';
 
 import LiquidTabBar from '../components/LiquidTabBar';
@@ -30,9 +33,12 @@ import { NetworkProvider, useNetwork } from '../lib/NetworkContext';
 import { flushQueue } from '../lib/reportQueue';
 import { registerPushToken } from '../lib/pushNotifications';
 import { supabase } from '../lib/supabase';
+import { LockdownProvider } from '../lib/LockdownContext';
+import LockdownAlert from '../components/LockdownAlert';
 import OfflineBanner from '../components/OfflineBanner';
 import AIChatScreen from '../screens/AIChatScreen';
 import AuthScreen from '../screens/AuthScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import HomeScreen from '../screens/HomeScreen';
 import MapScreen from '../screens/MapScreen';
@@ -216,7 +222,14 @@ function MainTabNavigator({ navigation }: any) {
 function AppContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const { colors } = useTheme();
+
+  const checkOnboarding = (s: Session | null) => {
+    if (!s) { setNeedsOnboarding(false); return; }
+    const complete = s.user?.user_metadata?.onboarding_complete;
+    setNeedsOnboarding(!complete);
+  };
 
   const { wasOffline } = useNetwork();
 
@@ -227,6 +240,7 @@ function AppContent() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      checkOnboarding(session);
       setLoading(false);
       if (session?.user?.id) registerPushToken(session.user.id);
     });
@@ -235,6 +249,7 @@ function AppContent() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      checkOnboarding(session);
       setLoading(false);
       if (session?.user?.id) registerPushToken(session.user.id);
     });
@@ -254,10 +269,14 @@ function AppContent() {
     <>
       <StatusBar style={colors.statusBar as 'light' | 'dark' | 'auto'} />
       <OfflineBanner />
+      <LockdownAlert />
       {!session ? (
         <AuthScreen onLoginSuccess={() => {}} />
+      ) : needsOnboarding ? (
+        <OnboardingScreen onComplete={() => setNeedsOnboarding(false)} />
       ) : (
         <NotificationProvider userId={session.user.id}>
+          <ProximityProvider userId={session.user.id}>
           <Stack.Navigator>
             <Stack.Screen
               name="Main"
@@ -280,6 +299,7 @@ function AppContent() {
               options={{ headerShown: false, presentation: 'modal' }}
             />
           </Stack.Navigator>
+          </ProximityProvider>
         </NotificationProvider>
       )}
     </>
@@ -288,21 +308,27 @@ function AppContent() {
 
 export default function RootLayout() {
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
+      <LanguageProvider>
       <ThemeProvider>
         <HapticsProvider>
         <SoundsProvider>
         <NetworkProvider>
         <ReportModeProvider>
+          <LockdownProvider>
           <ErrorBoundary>
             <AppContent />
           </ErrorBoundary>
+          </LockdownProvider>
         </ReportModeProvider>
         </NetworkProvider>
         </SoundsProvider>
         </HapticsProvider>
       </ThemeProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

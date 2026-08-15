@@ -8,8 +8,15 @@
     "scheme": "campuswatch",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "autolinking": {
+      "exclude": ["react-native-ble-plx"]
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "CampusWatch uses Bluetooth briefly to detect nearby app users during incidents. Tokens rotate every 15 minutes and are never stored long-term.",
+        "NSBluetoothPeripheralUsageDescription": "CampusWatch uses Bluetooth briefly to help deliver nearby incident alerts. No personal identity is broadcast."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,8 +30,11 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE"
@@ -83,8 +93,7 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     },
     "extra": {
       "router": {},
@@ -96,7 +105,10 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/0a77cb3d-528b-43ba-842f-3a34fb6c6070"
+      "url": "https://u.expo.dev/0a77cb3d-528b-43ba-842f-3a34fb6c6070",
+      "requestHeaders": {
+        "expo-channel-name": "preview"
+      }
     }
   }
 }

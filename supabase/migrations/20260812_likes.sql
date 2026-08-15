@@ -1,7 +1,8 @@
 -- Run in Supabase SQL editor to enable likes on comments and incident reports.
 -- Uses uuid FKs to match comments.id and reports.id in this project.
+-- Safe to re-run (idempotent).
 
--- If a previous attempt partially created these tables with wrong types, run first:
+-- If a previous attempt used wrong column types, run first:
 -- drop table if exists public.comment_likes cascade;
 -- drop table if exists public.report_likes cascade;
 
@@ -24,6 +25,10 @@ create table if not exists public.report_likes (
 alter table public.comment_likes enable row level security;
 alter table public.report_likes enable row level security;
 
+drop policy if exists "Anyone can read comment likes" on public.comment_likes;
+drop policy if exists "Authenticated users can like comments" on public.comment_likes;
+drop policy if exists "Users can unlike their comment likes" on public.comment_likes;
+
 create policy "Anyone can read comment likes"
   on public.comment_likes for select using (true);
 
@@ -34,6 +39,10 @@ create policy "Authenticated users can like comments"
 create policy "Users can unlike their comment likes"
   on public.comment_likes for delete
   using (auth.uid() = user_id);
+
+drop policy if exists "Anyone can read report likes" on public.report_likes;
+drop policy if exists "Authenticated users can like reports" on public.report_likes;
+drop policy if exists "Users can unlike their report likes" on public.report_likes;
 
 create policy "Anyone can read report likes"
   on public.report_likes for select using (true);

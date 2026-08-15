@@ -26,6 +26,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../lib/ThemeContext';
 import { useNetwork } from '../lib/NetworkContext';
 import { enqueueReport } from '../lib/reportQueue';
+import { insertReportPayload } from '../lib/reportProximity';
+import { useProximityOptional } from '../lib/ProximityContext';
+import { useFeedback } from '../lib/useFeedback';
 
 const DEFAULT_REGION = {
   latitude: 55.1707,
@@ -40,6 +43,8 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
   const tabBarPadding = getTabBarClearance(insets);
   const { isDark, colors: themeColors } = useTheme();
   const { isOnline } = useNetwork();
+  const { reportSubmitted } = useFeedback();
+  const proximity = useProximityOptional();
   const colors = {
     background: themeColors.background,
     gradientBg: themeColors.backgroundGradient,
@@ -245,8 +250,9 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
       }
       payload.image_url = publicImageUrl;
 
-      const { error } = await supabase.from('reports').insert([payload]);
-      if (error) throw error;
+      reportSubmitted();
+      const nearbyTokens = proximity?.enabled ? proximity.getNearbyTokens() : [];
+      await insertReportPayload(payload, nearbyTokens);
       Alert.alert('Success', 'Your report has been submitted safely.', [
         {
           text: 'OK',

@@ -29,13 +29,15 @@ import { useReportMode } from '../lib/ReportModeContext';
 import { TAB_BAR_BOTTOM_GAP, TAB_BAR_HEIGHT } from '../lib/tabBarLayout';
 import { useTabBarScrollControls } from '../lib/TabBarScrollContext';
 import { useTheme } from '../lib/ThemeContext';
+import { useTranslation } from 'react-i18next';
+import { useLockdown } from '../lib/LockdownContext';
 
-const TABS = [
-  { route: 'Home',            label: 'Home',   icon: 'home-outline',       activeIcon: 'home'       },
-  { route: 'Campus Feed',     label: 'Feed',   icon: 'list-outline',       activeIcon: 'list'       },
-  { route: 'Report Incident', label: 'Report', icon: 'add-circle-outline', activeIcon: 'add-circle' },
-  { route: 'Campus Map',      label: 'Map',    icon: 'map-outline',        activeIcon: 'map'        },
-  { route: 'AI Assistant',    label: 'AI',     icon: 'sparkles-outline',   activeIcon: 'sparkles'   },
+const TAB_DEFS = [
+  { route: 'Home',            labelKey: 'tabs.home',   icon: 'home-outline',       activeIcon: 'home'       },
+  { route: 'Campus Feed',     labelKey: 'tabs.feed',   icon: 'list-outline',       activeIcon: 'list'       },
+  { route: 'Report Incident', labelKey: 'tabs.report', icon: 'add-circle-outline', activeIcon: 'add-circle' },
+  { route: 'Campus Map',      labelKey: 'tabs.map',    icon: 'map-outline',        activeIcon: 'map'        },
+  { route: 'AI Assistant',    labelKey: 'tabs.ai',     icon: 'sparkles-outline',   activeIcon: 'sparkles'   },
 ];
 
 const REPORT_INDEX = 2;
@@ -46,7 +48,7 @@ const SIDE_MARGIN = 16;
 const BOTTOM_GAP = TAB_BAR_BOTTOM_GAP;
 const BAR_H = TAB_BAR_HEIGHT;
 const BAR_W = SW - SIDE_MARGIN * 2;
-const TAB_COUNT = TABS.length;
+const TAB_COUNT = TAB_DEFS.length;
 const TAB_W = BAR_W / TAB_COUNT;
 
 const SPRING_SNAP = { damping: 18, stiffness: 320, mass: 0.85 };
@@ -129,8 +131,14 @@ function TabButton({ tab, isFocused, isHighlighted, isReport, onPress, onLongPre
 export default function FloatingTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
   const { isDark, colors } = useTheme();
+  const { t, i18n } = useTranslation();
+  const TABS = React.useMemo(
+    () => TAB_DEFS.map((tab) => ({ ...tab, label: t(tab.labelKey) })),
+    [t, i18n.language]
+  );
   const { tabBarOffset, hiddenLockCount, showTabBar, hideTabBar } = useTabBarScrollControls();
   const { openPicker } = useReportMode();
+  const { setReportingActive } = useLockdown();
   const { tabPress, tabLongPress, tabDragSnap, barPress } = useFeedback();
   const isAITab = state.index === AI_TAB_INDEX;
   const shouldForceHide = isAITab || hiddenLockCount > 0;
@@ -339,12 +347,14 @@ export default function FloatingTabBar({ state, navigation }) {
                 colors={colors}
                 onPressInHaptic={tabPress}
                 onPress={() => {
+                  if (isReport) setReportingActive(true);
                   setHoverIndex(index);
                   switchTab(index);
                 }}
                 onLongPress={
                   isReport
                     ? () => {
+                        setReportingActive(true);
                         tabLongPress();
                         openPicker?.();
                       }
