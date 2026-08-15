@@ -35,6 +35,23 @@ jobs:
       - name: Prebuild native Android project
         run: npx expo prebuild --platform android
 
+      - name: Tune Gradle memory (fixes OOM on CI)
+        run: |
+          echo "org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+          echo "org.gradle.workers.max=1" >> android/gradle.properties
+
+      - name: Disable lint on release builds (fixes OOM — real fix this time)
+        run: |
+          cat >> android/app/build.gradle << 'INNEREOF'
+
+          android {
+              lint {
+                  checkReleaseBuilds false
+                  abortOnError false
+              }
+          }
+          INNEREOF
+
       - name: Build APK locally
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
