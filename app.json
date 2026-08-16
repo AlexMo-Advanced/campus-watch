@@ -90,7 +90,8 @@
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "./plugins/withGradleFixes"
     ],
     "experiments": {
       "typedRoutes": true

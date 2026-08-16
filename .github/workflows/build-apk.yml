@@ -35,28 +35,6 @@ jobs:
       - name: Prebuild native Android project
         run: npx expo prebuild --platform android
 
-      - name: Tune Gradle memory (replaces default jvmargs cleanly)
-        run: |
-          sed -i '/org.gradle.jvmargs/d' android/gradle.properties
-          echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1536m" >> android/gradle.properties
-          echo "org.gradle.workers.max=1" >> android/gradle.properties
-          echo "org.gradle.daemon=false" >> android/gradle.properties
-          echo "--- Final gradle.properties: ---"
-          cat android/gradle.properties
-
-      - name: Force-disable lintVital tasks project-wide
-        run: |
-          cat >> android/build.gradle << 'INNEREOF'
-
-          allprojects {
-              tasks.whenTaskAdded { task ->
-                  if (task.name.contains("lintVital")) {
-                      task.enabled = false
-                  }
-              }
-          }
-          INNEREOF
-
       - name: Build APK locally
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
