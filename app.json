@@ -9,7 +9,9 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "autolinking": {
-      "exclude": ["react-native-ble-plx"]
+      "exclude": [
+        "react-native-ble-plx"
+      ]
     },
     "ios": {
       "supportsTablet": true,
@@ -91,7 +93,8 @@
           "recordAudioAndroid": false
         }
       ],
-      "./plugins/withGradleFixes"
+      "./plugins/withGradleFixes",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
