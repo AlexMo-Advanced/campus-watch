@@ -272,7 +272,7 @@
     "subtitle": "Hold the Report button anytime to switch modes",
     "instantTitle": "Instant Photo Report",
     "instantSub": "Snap a photo first — quick posting",
-    "standardTitle": "Standard Report",
+    "standardTitle": "Standard Reporting",
     "standardSub": "Full form with category, severity & map pin",
     "standardSubFull": "Full form with map, details, and optional photo",
     "defaultWhenTap": "Default when tapping Report"

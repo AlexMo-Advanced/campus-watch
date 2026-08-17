@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleSheet,
   Text,
@@ -32,6 +32,8 @@ import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/ThemeContext';
 import { useFeedback } from '../lib/useFeedback';
 import { useNetwork } from '../lib/NetworkContext';
+import * as Location from 'expo-location';
+import { useProximityOptional } from '../lib/ProximityContext';
 
 const SUGGESTED_PROMPTS = [
   'How do I report a safety incident?',
@@ -77,9 +79,113 @@ function TypingDots({ color = '#2563eb' }) {
   );
 }
 
+function AmbientBackground({ isDark }) {
+  const orb1 = useSharedValue(0);
+  const orb2 = useSharedValue(0);
+  const orb3 = useSharedValue(0);
+
+  useEffect(() => {
+    orb1.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 4200, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 4200, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+    orb2.value = withDelay(
+      900,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 5200, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0, { duration: 5200, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        false
+      )
+    );
+    orb3.value = withDelay(
+      1800,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 3800, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0, { duration: 3800, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        false
+      )
+    );
+  }, [orb1, orb2, orb3]);
+
+  const orb1Style = useAnimatedStyle(() => ({
+    opacity: interpolate(orb1.value, [0, 1], [0.12, 0.32]),
+    transform: [
+      { translateX: interpolate(orb1.value, [0, 1], [-20, 30]) },
+      { translateY: interpolate(orb1.value, [0, 1], [0, 40]) },
+      { scale: interpolate(orb1.value, [0, 1], [1, 1.18]) },
+    ],
+  }));
+  const orb2Style = useAnimatedStyle(() => ({
+    opacity: interpolate(orb2.value, [0, 1], [0.08, 0.24]),
+    transform: [
+      { translateX: interpolate(orb2.value, [0, 1], [30, -25]) },
+      { translateY: interpolate(orb2.value, [0, 1], [20, -30]) },
+      { scale: interpolate(orb2.value, [0, 1], [1.05, 0.92]) },
+    ],
+  }));
+  const orb3Style = useAnimatedStyle(() => ({
+    opacity: interpolate(orb3.value, [0, 1], [0.06, 0.2]),
+    transform: [
+      { translateX: interpolate(orb3.value, [0, 1], [-15, 20]) },
+      { scale: interpolate(orb3.value, [0, 1], [0.9, 1.12]) },
+    ],
+  }));
+
+  const primary = isDark ? '#2563eb' : '#3b82f6';
+  const accent = isDark ? '#7c3aed' : '#818cf8';
+
+  return (
+    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+      <Animated.View style={[styles.ambientOrb, styles.ambientOrbTop, { backgroundColor: primary }, orb1Style]} />
+      <Animated.View style={[styles.ambientOrb, styles.ambientOrbMid, { backgroundColor: accent }, orb2Style]} />
+      <Animated.View style={[styles.ambientOrb, styles.ambientOrbLow, { backgroundColor: primary }, orb3Style]} />
+    </View>
+  );
+}
+
+function GlowingEdge({ isDark }) {
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.35, { duration: 2200, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+  }, [pulse]);
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(pulse.value, [0, 1], [0.35, 0.85]),
+  }));
+
+  const colors = isDark
+    ? ['rgba(37, 99, 235, 0.55)', 'rgba(124, 58, 237, 0.35)', 'rgba(37, 99, 235, 0.15)', 'rgba(37, 99, 235, 0.55)']
+    : ['rgba(37, 99, 235, 0.45)', 'rgba(129, 140, 248, 0.3)', 'rgba(37, 99, 235, 0.1)', 'rgba(37, 99, 235, 0.45)'];
+
+  return (
+    <Animated.View style={[styles.glowEdge, glowStyle]} pointerEvents="none">
+      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+    </Animated.View>
+  );
+}
+
 function ChatLoadingScreen({ isDark, colors }) {
   const shimmer = useSharedValue(0);
   const pulse = useSharedValue(0.4);
+  const ringSpin = useSharedValue(0);
 
   useEffect(() => {
     shimmer.value = withRepeat(
@@ -95,12 +201,20 @@ function ChatLoadingScreen({ isDark, colors }) {
       -1,
       false
     );
-  }, [shimmer, pulse]);
+    ringSpin.value = withRepeat(
+      withTiming(360, { duration: 2400, easing: Easing.linear }),
+      -1,
+      false
+    );
+  }, [shimmer, pulse, ringSpin]);
 
   const shimmerStyle = useAnimatedStyle(() => ({
     opacity: interpolate(shimmer.value, [0, 1], [0.25, 0.75]),
   }));
   const pulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
+  const ringStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${ringSpin.value}deg` }],
+  }));
 
   const bubbleBg = isDark ? 'rgba(30, 41, 59, 0.85)' : 'rgba(255, 255, 255, 0.85)';
   const lineBg = isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(148, 163, 184, 0.35)';
@@ -108,9 +222,19 @@ function ChatLoadingScreen({ isDark, colors }) {
   return (
     <View style={styles.loadingContent}>
       <Animated.View entering={FadeInUp.duration(500)} style={styles.loadingHero}>
-        <Animated.View style={[styles.loadingHeroIcon, pulseStyle, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}>
-          <Ionicons name="sparkles" size={28} color="#2563eb" />
-        </Animated.View>
+        <View style={styles.loadingHeroRingWrap}>
+          <Animated.View style={[styles.loadingHeroRing, ringStyle]}>
+            <LinearGradient
+              colors={['#2563eb', '#7c3aed', 'transparent', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+          </Animated.View>
+          <Animated.View style={[styles.loadingHeroIcon, pulseStyle, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}>
+            <Ionicons name="sparkles" size={28} color="#2563eb" />
+          </Animated.View>
+        </View>
         <Text style={[styles.loadingTitle, { color: colors.text }]}>CampusWatch AI</Text>
         <Text style={[styles.loadingSub, { color: colors.textSecondary }]}>Loading campus intelligence...</Text>
       </Animated.View>
@@ -134,6 +258,132 @@ function ChatLoadingScreen({ isDark, colors }) {
   );
 }
 
+function AnimatedInputBar({
+  inputText,
+  setInputText,
+  sendMessage,
+  isTyping,
+  isDark,
+  colors,
+  insets,
+  tap,
+}) {
+  const keyboardOffset = useSharedValue(0);
+  const focusGlow = useSharedValue(0);
+  const sendPulse = useSharedValue(1);
+  const hasText = inputText.trim().length > 0;
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = Keyboard.addListener(showEvent, (e) => {
+      const offset = Math.max(0, e.endCoordinates.height - insets.bottom);
+      keyboardOffset.value = withTiming(offset, {
+        duration: e.duration ?? 250,
+        easing: Easing.out(Easing.cubic),
+      });
+    });
+    const onHide = Keyboard.addListener(hideEvent, (e) => {
+      keyboardOffset.value = withTiming(0, {
+        duration: e?.duration ?? 250,
+        easing: Easing.out(Easing.cubic),
+      });
+    });
+
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, [insets.bottom, keyboardOffset]);
+
+  useEffect(() => {
+    focusGlow.value = withTiming(hasText ? 1 : 0, { duration: 220 });
+    if (hasText) {
+      sendPulse.value = withRepeat(
+        withSequence(
+          withTiming(1.06, { duration: 600 }),
+          withTiming(1, { duration: 600 })
+        ),
+        -1,
+        false
+      );
+    } else {
+      sendPulse.value = withTiming(1, { duration: 180 });
+    }
+  }, [hasText, focusGlow, sendPulse]);
+
+  const barStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -keyboardOffset.value }],
+    paddingBottom: keyboardOffset.value > 0 ? 10 : insets.bottom + 8,
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(focusGlow.value, [0, 1], [0, isDark ? 0.55 : 0.4]),
+    transform: [{ scale: interpolate(focusGlow.value, [0, 1], [0.98, 1]) }],
+  }));
+
+  const sendStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sendPulse.value }],
+  }));
+
+  const inputBarBg = isDark ? 'rgba(30, 41, 59, 0.92)' : 'rgba(255, 255, 255, 0.92)';
+
+  return (
+    <Animated.View
+      entering={FadeInUp.delay(300).duration(400)}
+      style={[
+        styles.inputBarOuter,
+        barStyle,
+        { backgroundColor: inputBarBg, borderTopColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(226, 232, 240, 0.8)' },
+      ]}
+    >
+      <Animated.View style={[styles.inputGlowRing, glowStyle]} pointerEvents="none">
+        <LinearGradient
+          colors={['rgba(37, 99, 235, 0.5)', 'rgba(124, 58, 237, 0.25)', 'rgba(37, 99, 235, 0.5)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      </Animated.View>
+
+      <View style={styles.inputBar}>
+        <TextInput
+          style={[
+            styles.input,
+            {
+              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.85)' : 'rgba(241, 245, 249, 0.95)',
+              color: isDark ? '#f1f5f9' : '#0f172a',
+              borderColor: hasText ? '#2563eb' : (isDark ? '#334155' : '#e2e8f0'),
+            },
+          ]}
+          placeholder="Ask about campus safety..."
+          placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
+          value={inputText}
+          onChangeText={setInputText}
+          multiline
+          maxLength={500}
+          onSubmitEditing={() => sendMessage()}
+          returnKeyType="send"
+          blurOnSubmit
+          onFocus={() => { focusGlow.value = withTiming(1, { duration: 200 }); }}
+          onBlur={() => { focusGlow.value = withTiming(hasText ? 1 : 0, { duration: 200 }); }}
+        />
+        <Animated.View style={sendStyle}>
+          <TouchableOpacity
+            style={[styles.sendBtn, { backgroundColor: hasText ? '#2563eb' : (isDark ? '#334155' : '#e2e8f0') }]}
+            onPress={() => sendMessage()}
+            onPressIn={() => hasText && tap()}
+            disabled={!hasText || isTyping}
+          >
+            <Ionicons name="send" size={18} color={hasText ? '#ffffff' : (isDark ? '#475569' : '#94a3b8')} />
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function AIChatScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { isDark, colors } = useTheme();
@@ -142,6 +392,9 @@ export default function AIChatScreen({ navigation }) {
   const flatListRef = useRef(null);
   const [reports, setReports] = useState([]);
   const [pageLoading, setPageLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+  const proximity = useProximityOptional();
+  const bleCount = proximity ? proximity.getRecentTokenCount() : 0;
 
   useEffect(() => {
     fetchReports();
@@ -149,9 +402,11 @@ export default function AIChatScreen({ navigation }) {
 
   const fetchReports = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
       const { data } = await supabase
         .from('reports')
-        .select('title, category, severity, location, description, status, created_at')
+        .select('title, category, severity, location, description, status, created_at, user_id')
         .order('created_at', { ascending: false })
         .limit(30);
       if (data) setReports(data);
@@ -180,7 +435,23 @@ export default function AIChatScreen({ navigation }) {
 
   const gradientColors = colors.backgroundGradient;
   const headerBg = isDark ? 'rgba(15, 23, 42, 0.72)' : 'rgba(255, 255, 255, 0.72)';
-  const inputBarBg = isDark ? 'rgba(30, 41, 59, 0.92)' : 'rgba(255, 255, 255, 0.92)';
+
+  const headerPulse = useSharedValue(0);
+  useEffect(() => {
+    headerPulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1800 }),
+        withTiming(0.4, { duration: 1800 })
+      ),
+      -1,
+      false
+    );
+  }, [headerPulse]);
+
+  const headerBadgeStyle = useAnimatedStyle(() => ({
+    shadowOpacity: interpolate(headerPulse.value, [0.4, 1], [0.15, 0.45]),
+    transform: [{ scale: interpolate(headerPulse.value, [0.4, 1], [1, 1.04]) }],
+  }));
 
   const sendMessage = async (text) => {
     const userText = (text || inputText).trim();
@@ -207,10 +478,27 @@ export default function AIChatScreen({ navigation }) {
     setIsTyping(true);
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
 
+    let locString = null;
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        locString = `Lat: ${loc.coords.latitude}, Lng: ${loc.coords.longitude}`;
+      }
+    } catch (e) {}
+
+    const userContext = {
+      userName: currentUser?.user_metadata?.display_name || currentUser?.email?.split('@')[0] || 'Student',
+      personalReportsCount: currentUser ? reports.filter((r) => r.user_id === currentUser.id).length : 0,
+      locationString: locString,
+      bleInfo: bleCount,
+    };
+
     try {
       const reply = await askCampusAssistant(
         updatedHistory.filter((m) => m.id !== 'welcome'),
-        buildReportContext()
+        buildReportContext(),
+        userContext
       );
       setMessages((prev) => [...prev, { id: `ai-${Date.now()}`, role: 'model', parts: reply }]);
       aiReply();
@@ -240,7 +528,7 @@ export default function AIChatScreen({ navigation }) {
 
   const renderMessage = ({ item, index }) => {
     const isUser = item.role === 'user';
-    const anim = isUser ? FadeInRight.duration(300) : FadeInLeft.delay(index === 0 ? 200 : 0).duration(300);
+    const anim = isUser ? FadeInRight.duration(300).springify() : FadeInLeft.delay(index === 0 ? 200 : 0).duration(300).springify();
     return (
       <Animated.View entering={anim} style={[styles.messageRow, isUser && styles.messageRowUser]}>
         {!isUser && (
@@ -274,6 +562,7 @@ export default function AIChatScreen({ navigation }) {
   );
 
   const handleBack = () => {
+    Keyboard.dismiss();
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
@@ -282,13 +571,12 @@ export default function AIChatScreen({ navigation }) {
   };
 
   return (
-    <LinearGradient colors={gradientColors} style={styles.container} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
-      >
-        {/* Header — flush to top safe area */}
+    <View style={styles.container}>
+      <LinearGradient colors={gradientColors} style={StyleSheet.absoluteFillObject} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+      <AmbientBackground isDark={isDark} />
+      <GlowingEdge isDark={isDark} />
+
+      <View style={styles.flex}>
         <Animated.View
           entering={FadeInDown.duration(350)}
           style={[styles.header, { paddingTop: insets.top + 4, backgroundColor: headerBg, borderBottomColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(226, 232, 240, 0.8)' }]}
@@ -297,9 +585,9 @@ export default function AIChatScreen({ navigation }) {
             <Ionicons name="arrow-back" size={22} color={isDark ? '#f1f5f9' : '#0f172a'} />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
-            <View style={[styles.headerAIBadge, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}>
+            <Animated.View style={[styles.headerAIBadge, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }, headerBadgeStyle]}>
               <Ionicons name="sparkles" size={16} color="#2563eb" />
-            </View>
+            </Animated.View>
             <View>
               <Text style={[styles.headerTitle, { color: isDark ? '#f1f5f9' : '#0f172a' }]}>CampusWatch AI</Text>
               <Text style={[styles.headerSub, { color: isDark ? '#94a3b8' : '#64748b' }]}>Powered by PinayAI</Text>
@@ -317,9 +605,11 @@ export default function AIChatScreen({ navigation }) {
               data={messages}
               keyExtractor={(item) => item.id}
               renderItem={renderMessage}
-              contentContainerStyle={styles.messageList}
+              contentContainerStyle={[styles.messageList, { paddingBottom: 12 }]}
               ListFooterComponent={isTyping ? <TypingIndicator /> : null}
               onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
               showsVerticalScrollIndicator={false}
             />
 
@@ -328,7 +618,7 @@ export default function AIChatScreen({ navigation }) {
                 <Text style={[styles.suggestionsLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>Try asking:</Text>
                 <View style={styles.suggestionsRow}>
                   {SUGGESTED_PROMPTS.map((prompt, i) => (
-                    <Animated.View key={prompt} entering={FadeInUp.delay(i * 80).duration(350)}>
+                    <Animated.View key={prompt} entering={FadeInUp.delay(i * 80).duration(350).springify()}>
                       <TouchableOpacity
                         style={[styles.suggestionChip, { backgroundColor: isDark ? 'rgba(30, 58, 95, 0.85)' : 'rgba(239, 246, 255, 0.95)', borderColor: isDark ? 'rgba(37, 99, 235, 0.35)' : '#bfdbfe' }]}
                         onPress={() => sendMessage(prompt)}
@@ -344,42 +634,40 @@ export default function AIChatScreen({ navigation }) {
           </>
         )}
 
-        {/* Input Bar */}
         {!pageLoading && (
-          <Animated.View
-            entering={FadeInUp.delay(300).duration(400)}
-            style={[styles.inputBar, { backgroundColor: inputBarBg, borderTopColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(226, 232, 240, 0.8)', paddingBottom: insets.bottom + 8 }]}
-          >
-            <TextInput
-              style={[styles.input, { backgroundColor: isDark ? 'rgba(15, 23, 42, 0.85)' : 'rgba(241, 245, 249, 0.95)', color: isDark ? '#f1f5f9' : '#0f172a', borderColor: isDark ? '#334155' : '#e2e8f0' }]}
-              placeholder="Ask about campus safety..."
-              placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={500}
-              onSubmitEditing={() => sendMessage()}
-              returnKeyType="send"
-              blurOnSubmit
-            />
-        <TouchableOpacity
-          style={[styles.sendBtn, { backgroundColor: inputText.trim() ? '#2563eb' : (isDark ? '#334155' : '#e2e8f0') }]}
-          onPress={() => sendMessage()}
-          onPressIn={() => inputText.trim() && tap()}
-          disabled={!inputText.trim() || isTyping}
-        >
-              <Ionicons name="send" size={18} color={inputText.trim() ? '#ffffff' : (isDark ? '#475569' : '#94a3b8')} />
-            </TouchableOpacity>
-          </Animated.View>
+          <AnimatedInputBar
+            inputText={inputText}
+            setInputText={setInputText}
+            sendMessage={sendMessage}
+            isTyping={isTyping}
+            isDark={isDark}
+            colors={colors}
+            insets={insets}
+            tap={tap}
+          />
         )}
-      </KeyboardAvoidingView>
-    </LinearGradient>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
+  ambientOrb: {
+    position: 'absolute',
+    borderRadius: 999,
+  },
+  ambientOrbTop: { width: 220, height: 220, top: 80, right: -60 },
+  ambientOrbMid: { width: 180, height: 180, top: '38%', left: -70 },
+  ambientOrbLow: { width: 140, height: 140, bottom: 160, right: 20 },
+  glowEdge: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 1.5,
+    borderRadius: 0,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -406,6 +694,9 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#2563eb',
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
   },
   headerTitle: { fontSize: 16, fontWeight: '800' },
   headerSub: { fontSize: 11, fontWeight: '500', marginTop: 1 },
@@ -425,18 +716,40 @@ const styles = StyleSheet.create({
   suggestionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   suggestionChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1 },
   suggestionChipText: { fontSize: 12, fontWeight: '600' },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
-  input: { flex: 1, borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
+  inputBarOuter: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 10,
+    paddingHorizontal: 12,
+  },
+  inputGlowRing: {
+    position: 'absolute',
+    top: 6,
+    left: 10,
+    right: 10,
+    height: 52,
+    borderRadius: 26,
+    overflow: 'hidden',
+  },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  input: { flex: 1, borderRadius: 20, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
   sendBtn: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
   loadingContent: { flex: 1, padding: 24, justifyContent: 'center' },
   loadingHero: { alignItems: 'center', marginBottom: 32 },
+  loadingHeroRingWrap: { width: 80, height: 80, marginBottom: 14, justifyContent: 'center', alignItems: 'center' },
+  loadingHeroRing: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    overflow: 'hidden',
+    opacity: 0.7,
+  },
   loadingHeroIcon: {
     width: 64,
     height: 64,
     borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 14,
   },
   loadingTitle: { fontSize: 20, fontWeight: '800', marginBottom: 4 },
   loadingSub: { fontSize: 13, fontWeight: '500' },

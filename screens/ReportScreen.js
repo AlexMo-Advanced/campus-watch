@@ -1,5 +1,5 @@
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import {
   REPORT_MODE_INSTANT,
@@ -13,7 +13,7 @@ import InstantReportDetailsScreen from './InstantReportDetailsScreen';
 import StandardReportScreen from './StandardReportScreen';
 
 export default function ReportScreen({ navigation }) {
-  const { preference, consumeLaunchMode, ready } = useReportMode();
+  const { preference, consumeLaunchMode, ready, pendingLaunchMode } = useReportMode();
   const { setReportingActive } = useLockdown();
   const [mode, setMode] = useState(REPORT_MODE_STANDARD);
   const [instantStep, setInstantStep] = useState('camera');
@@ -42,6 +42,18 @@ export default function ReportScreen({ navigation }) {
       setPhotoUri(null);
     }, [ready, preference, consumeLaunchMode])
   );
+
+  // Picker can launch a mode while this tab is already focused (long-press on Report).
+  useEffect(() => {
+    if (!ready || !pendingLaunchMode || inDetailsRef.current || !isFocused) return;
+
+    const launchMode = consumeLaunchMode();
+    if (!launchMode) return;
+
+    setMode(launchMode);
+    setInstantStep('camera');
+    setPhotoUri(null);
+  }, [ready, pendingLaunchMode, consumeLaunchMode, isFocused]);
 
   const handlePhotoTaken = (uri) => {
     setPhotoUri(uri);

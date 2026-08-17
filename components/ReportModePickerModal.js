@@ -71,7 +71,7 @@ export default function ReportModePickerModal({ navigation }) {
               <Ionicons name="document-text" size={24} color="#ffffff" />
             </View>
             <View style={styles.optionBody}>
-              <Text style={styles.optionTitle}>{t('report.standard')} {t('report.title')}</Text>
+              <Text style={styles.optionTitle}>{t('reportModePicker.standardTitle')}</Text>
               <Text style={styles.optionDesc}>{t('reportModePicker.standardSubFull')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#94a3b8" />

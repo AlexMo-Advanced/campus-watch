@@ -23,7 +23,7 @@ function priorityForUser(
   const inTight = distanceM !== null && distanceM <= TIGHT_RADIUS_M;
   const inWide = distanceM !== null && distanceM <= WIDE_RADIUS_M;
 
-  if (bleMatch && isCrisisCategory) return 'crisis';
+  if ((bleMatch || inTight) && isCrisisCategory) return 'crisis';
   if (inTight && bleMatch) return 'critical';
   if (inTight || bleMatch) return 'high';
   if (inWide) return 'normal';

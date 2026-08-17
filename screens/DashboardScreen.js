@@ -68,6 +68,8 @@ import { useFeedback } from '../lib/useFeedback';
 
 import { useTranslation } from 'react-i18next';
 
+import { useProximityOptional } from '../lib/ProximityContext';
+
 
 
 export default function DashboardScreen({ navigation }) {
@@ -91,6 +93,10 @@ export default function DashboardScreen({ navigation }) {
   const { isOnline } = useNetwork();
 
   const { launchReport } = useReportMode();
+
+  const proximity = useProximityOptional();
+
+  const bleCount = proximity ? proximity.getRecentTokenCount() : 0;
 
 
 
@@ -238,11 +244,19 @@ export default function DashboardScreen({ navigation }) {
 
     try {
 
+      let currentUserId = null;
+
+      let currentUserName = 'Student';
+
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
 
-        setUserName(user.user_metadata?.display_name || user.email?.split('@')[0] || 'Student');
+        currentUserId = user.id;
+
+        currentUserName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Student';
+
+        setUserName(currentUserName);
 
       }
 
@@ -274,6 +288,8 @@ export default function DashboardScreen({ navigation }) {
 
           let nearbyCount = null;
 
+          let locString = null;
+
           try {
 
             const { status } = await Location.requestForegroundPermissionsAsync();
@@ -283,6 +299,8 @@ export default function DashboardScreen({ navigation }) {
               const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
 
               const { latitude: uLat, longitude: uLng } = loc.coords;
+
+              locString = `Lat: ${uLat}, Lng: ${uLng}`;
 
               const toRad = (d) => (d * Math.PI) / 180;
 
@@ -320,7 +338,21 @@ export default function DashboardScreen({ navigation }) {
 
           }
 
-          const report = await generateCampusReport(fetchedReports, newCount, nearbyCount);
+          
+
+          const userContext = {
+
+            userName: currentUserName,
+
+            personalReportsCount: currentUserId ? fetchedReports.filter((r) => r.user_id === currentUserId).length : 0,
+
+            locationString: locString,
+
+            bleInfo: bleCount,
+
+          };
+
+          const report = await generateCampusReport(fetchedReports, newCount, nearbyCount, userContext);
 
           setAiReport(report);
 
