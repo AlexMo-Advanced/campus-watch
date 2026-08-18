@@ -1,8 +1,8 @@
 diff --git a/node_modules/react-native-ble-peripheral/android/build.gradle b/node_modules/react-native-ble-peripheral/android/build.gradle
-index e16c024..54f8b96 100640
+index 9b5638c..f231eb5 100644
 --- a/node_modules/react-native-ble-peripheral/android/build.gradle
 +++ b/node_modules/react-native-ble-peripheral/android/build.gradle
-@@ -1,23 +1,23 @@
+@@ -1,22 +1,22 @@
  apply plugin: "com.android.library"
  
 +def safeExtGet(prop, fallback) {
@@ -35,3 +35,4 @@ index e16c024..54f8b96 100640
 +    implementation fileTree(dir: "libs", include: ["*.jar"])
 +    implementation "com.facebook.react:react-native:+"
  }
+-
