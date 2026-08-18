@@ -1,8 +1,8 @@
 diff --git a/node_modules/react-native-ble-peripheral/android/build.gradle b/node_modules/react-native-ble-peripheral/android/build.gradle
-index 9b5638c..f231eb5 100644
+index 9b5638c..e5e50a4 100644
 --- a/node_modules/react-native-ble-peripheral/android/build.gradle
 +++ b/node_modules/react-native-ble-peripheral/android/build.gradle
-@@ -1,22 +1,22 @@
+@@ -1,22 +1,23 @@
  apply plugin: "com.android.library"
  
 +def safeExtGet(prop, fallback) {
@@ -34,5 +34,19 @@ index 9b5638c..f231eb5 100644
 -    compile "com.facebook.react:react-native:+"  // From node_modules
 +    implementation fileTree(dir: "libs", include: ["*.jar"])
 +    implementation "com.facebook.react:react-native:+"
++    implementation "androidx.appcompat:appcompat:1.6.1"
  }
 -
+diff --git a/node_modules/react-native-ble-peripheral/android/src/main/java/com/himelbrand/ble/peripheral/RNBLEModule.java b/node_modules/react-native-ble-peripheral/android/src/main/java/com/himelbrand/ble/peripheral/RNBLEModule.java
+index 71a5f60..6334681 100644
+--- a/node_modules/react-native-ble-peripheral/android/src/main/java/com/himelbrand/ble/peripheral/RNBLEModule.java
++++ b/node_modules/react-native-ble-peripheral/android/src/main/java/com/himelbrand/ble/peripheral/RNBLEModule.java
+@@ -22,7 +22,7 @@ import android.content.Context;
+ import android.os.Bundle;
+ import android.os.Handler;
+ import android.os.ParcelUuid;
+-import android.support.v7.app.AppCompatActivity;
++import androidx.appcompat.app.AppCompatActivity;
+ import android.text.TextUtils;
+ import android.util.Log;
+ 
