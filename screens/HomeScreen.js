@@ -79,12 +79,37 @@ export default function HomeScreen() {
   const [actionMenuReport, setActionMenuReport] = useState(null);
   const [shareReport, setShareReport] = useState(null);
   const [feedMode, setFeedMode] = useState('Active'); // 'Active' | 'Archive'
+  const [toastMessage, setToastMessage] = useState(null);
 
   // Filters State
   const [currentUser, setCurrentUser] = useState(null);
   const [timeFilter, setTimeFilter] = useState('All Time'); // All Time, 24h, 7d
   const [severityFilter, setSeverityFilter] = useState('All'); // All, High, Medium, Low
   const [postedByMe, setPostedByMe] = useState(false);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  const toggleFeedMode = () => {
+    const newMode = feedMode === 'Active' ? 'Archive' : 'Active';
+    setFeedMode(newMode);
+    showToast(`Switched to ${newMode}`);
+  };
+
+  const getLatestImage = (filterType) => {
+    let match = null;
+    if (filterType === 'Posted By Me') {
+      match = reports.find(r => r.user_id === currentUser?.id && r.image_url);
+    } else if (filterType === 'Last 24H') {
+      const now = new Date();
+      match = reports.find(r => (now - new Date(r.created_at)) <= 24 * 60 * 60 * 1000 && r.image_url);
+    } else if (filterType === 'High' || filterType === 'Crisis') {
+      match = reports.find(r => r.severity === filterType && r.image_url);
+    }
+    return match ? match.image_url : null;
+  };
 
   const fetchReports = async () => {
     try {
@@ -398,56 +423,75 @@ export default function HomeScreen() {
           <Text style={styles.offlineBarText}>{t('feed.offlineCached')}</Text>
         </View>
       )}
+
+      {/* Custom Header with Archive Toggle */}
+      <View style={styles.feedHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <TouchableOpacity onPress={toggleFeedMode} style={styles.archiveToggleBtn}>
+            <Ionicons name={feedMode === 'Archive' ? 'archive' : 'archive-outline'} size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={styles.feedHeaderTitle}>{feedMode === 'Active' ? 'Campus Feed' : 'Archived Alerts'}</Text>
+        </View>
+      </View>
+
       <View style={styles.filterSection}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storyScroll}>
+          {/* Posted By Me Story */}
           <TouchableOpacity 
-            style={[styles.filterChip, postedByMe && styles.filterChipActive]} 
+            style={styles.storyContainer} 
             onPress={() => setPostedByMe(!postedByMe)}>
-            <Ionicons name="person" size={14} color={postedByMe ? "#fff" : colors.icon} />
-            <Text style={[styles.filterChipText, postedByMe && styles.filterChipTextActive]}>{t('feed.postedByMe')}</Text>
+            <View style={[styles.storyCircle, postedByMe && { borderColor: colors.primary }]}>
+              {getLatestImage('Posted By Me') ? (
+                <Image source={{ uri: getLatestImage('Posted By Me') }} style={styles.storyImage} />
+              ) : (
+                <Ionicons name="person" size={24} color={postedByMe ? colors.primary : colors.icon} />
+              )}
+            </View>
+            <Text style={[styles.storyText, postedByMe && { color: colors.primary, fontWeight: '700' }]}>{t('feed.postedByMe')}</Text>
           </TouchableOpacity>
           
+          {/* Last 24H Story */}
           <TouchableOpacity 
-            style={[styles.filterChip, timeFilter === '24h' && styles.filterChipActive]} 
+            style={styles.storyContainer} 
             onPress={() => setTimeFilter(timeFilter === '24h' ? 'All Time' : '24h')}>
-            <Ionicons name="time" size={14} color={timeFilter === '24h' ? "#fff" : colors.icon} />
-            <Text style={[styles.filterChipText, timeFilter === '24h' && styles.filterChipTextActive]}>{t('feed.last24h')}</Text>
+            <View style={[styles.storyCircle, timeFilter === '24h' && { borderColor: colors.primary }]}>
+              {getLatestImage('Last 24H') ? (
+                <Image source={{ uri: getLatestImage('Last 24H') }} style={styles.storyImage} />
+              ) : (
+                <Ionicons name="time" size={24} color={timeFilter === '24h' ? colors.primary : colors.icon} />
+              )}
+            </View>
+            <Text style={[styles.storyText, timeFilter === '24h' && { color: colors.primary, fontWeight: '700' }]}>{t('feed.last24h')}</Text>
           </TouchableOpacity>
           
+          {/* High Severity Story */}
           <TouchableOpacity 
-            style={[styles.filterChip, severityFilter === 'High' && styles.filterChipActive]} 
+            style={styles.storyContainer} 
             onPress={() => setSeverityFilter(severityFilter === 'High' ? 'All' : 'High')}>
-            <Ionicons name="warning" size={14} color={severityFilter === 'High' ? "#fff" : colors.icon} />
-            <Text style={[styles.filterChipText, severityFilter === 'High' && styles.filterChipTextActive]}>High</Text>
+            <View style={[styles.storyCircle, severityFilter === 'High' && { borderColor: colors.danger }]}>
+              {getLatestImage('High') ? (
+                <Image source={{ uri: getLatestImage('High') }} style={styles.storyImage} />
+              ) : (
+                <Ionicons name="warning" size={24} color={severityFilter === 'High' ? colors.danger : colors.icon} />
+              )}
+            </View>
+            <Text style={[styles.storyText, severityFilter === 'High' && { color: colors.danger, fontWeight: '700' }]}>High</Text>
           </TouchableOpacity>
 
+          {/* Crisis Severity Story */}
           <TouchableOpacity 
-            style={[styles.filterChip, severityFilter === 'Crisis' && styles.filterChipActive]} 
+            style={styles.storyContainer} 
             onPress={() => setSeverityFilter(severityFilter === 'Crisis' ? 'All' : 'Crisis')}>
-            <Ionicons name="alert-circle" size={14} color={severityFilter === 'Crisis' ? "#fff" : colors.icon} />
-            <Text style={[styles.filterChipText, severityFilter === 'Crisis' && styles.filterChipTextActive]}>Crisis</Text>
+            <View style={[styles.storyCircle, severityFilter === 'Crisis' && { borderColor: colors.crisis }]}>
+              {getLatestImage('Crisis') ? (
+                <Image source={{ uri: getLatestImage('Crisis') }} style={styles.storyImage} />
+              ) : (
+                <Ionicons name="alert-circle" size={24} color={severityFilter === 'Crisis' ? colors.crisis : colors.icon} />
+              )}
+            </View>
+            <Text style={[styles.storyText, severityFilter === 'Crisis' && { color: colors.crisis, fontWeight: '700' }]}>Crisis</Text>
           </TouchableOpacity>
         </ScrollView>
-
-        {/* Active / Archive toggle slider */}
-        <View style={styles.feedModeToggleWrapper}>
-          <View style={styles.feedModeToggle}>
-            <TouchableOpacity
-              style={[styles.feedModeBtn, feedMode === 'Active' && styles.feedModeBtnActive]}
-              onPress={() => setFeedMode('Active')}
-            >
-              <Ionicons name="radio-button-on" size={14} color={feedMode === 'Active' ? '#fff' : colors.textSub} />
-              <Text style={[styles.feedModeBtnText, feedMode === 'Active' && styles.feedModeBtnTextActive]}>{t('feed.active')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.feedModeBtn, feedMode === 'Archive' && styles.feedModeBtnActive, feedMode === 'Archive' && styles.feedModeBtnArchiveActive]}
-              onPress={() => setFeedMode('Archive')}
-            >
-              <Ionicons name="archive" size={14} color={feedMode === 'Archive' ? '#fff' : colors.textSub} />
-              <Text style={[styles.feedModeBtnText, feedMode === 'Archive' && styles.feedModeBtnTextActive]}>{t('feed.archive')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </View>
 
       <FlatList
@@ -701,6 +745,14 @@ export default function HomeScreen() {
         isDark={isDark}
         onClose={() => setShareReport(null)}
       />
+      {toastMessage && (
+        <Animated.View entering={FadeInDown.duration(300)} style={styles.toastContainer}>
+          <View style={styles.toastBox}>
+            <Ionicons name="information-circle" size={20} color="#fff" />
+            <Text style={styles.toastText}>{toastMessage}</Text>
+          </View>
+        </Animated.View>
+      )}
     </LinearGradient>
   );
 }
@@ -709,19 +761,15 @@ const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1 },
   offlineBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#92400e', paddingVertical: 6 },
   offlineBarText: { color: '#fef3c7', fontSize: 12, fontWeight: '600' },
-  filterSection: { paddingTop: 12, paddingHorizontal: 16, paddingBottom: 0, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
-  filterScroll: { flexDirection: 'row', marginBottom: 10 },
-  filterChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8 },
-  filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  feedModeToggleWrapper: { alignItems: 'center', paddingBottom: 12 },
-  feedModeToggle: { flexDirection: 'row', backgroundColor: colors.placeholder, borderRadius: 20, padding: 3 },
-  feedModeBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 7, borderRadius: 18, gap: 6 },
-  feedModeBtnActive: { backgroundColor: colors.primary },
-  feedModeBtnArchiveActive: { backgroundColor: colors.warning },
-  feedModeBtnText: { fontSize: 13, fontWeight: '700', color: colors.textSub },
-  feedModeBtnTextActive: { color: '#ffffff' },
-  filterChipText: { fontSize: 13, color: colors.textSub, fontWeight: '600', marginLeft: 4 },
-  filterChipTextActive: { color: '#ffffff' },
+  feedHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+  feedHeaderTitle: { fontSize: 24, fontWeight: '800', color: colors.textMain },
+  archiveToggleBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryBg, justifyContent: 'center', alignItems: 'center' },
+  filterSection: { paddingHorizontal: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
+  storyScroll: { flexDirection: 'row', marginBottom: 10 },
+  storyContainer: { alignItems: 'center', marginRight: 16, width: 66 },
+  storyCircle: { width: 66, height: 66, borderRadius: 33, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: 2 },
+  storyImage: { width: '100%', height: '100%', borderRadius: 30 },
+  storyText: { fontSize: 11, color: colors.textSub, fontWeight: '600', marginTop: 6, textAlign: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   listContent: { padding: 16 },
   card: { borderRadius: 12, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.cardBorder, elevation: 2, backgroundColor: colors.cardBg },
@@ -792,4 +840,7 @@ const getStyles = (colors) => StyleSheet.create({
     borderColor: colors.cardBorder,
   },
   miniMap: { width: '100%', height: 180 },
+  toastContainer: { position: 'absolute', top: 60, left: 0, right: 0, alignItems: 'center', zIndex: 9999 },
+  toastBox: { backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 8, elevation: 4 },
+  toastText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

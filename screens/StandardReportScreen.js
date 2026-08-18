@@ -78,6 +78,9 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(true);
+  
+  const [floor, setFloor] = useState('');
+  const FLOORS = ['1st', '2nd', '3rd', 'Greenhouse', 'Outside'];
   const [imageUri, setImageUri] = useState(null);
   const [loading, setLoading] = useState(false);
   const [aiTagging, setAiTagging] = useState(false);
@@ -203,6 +206,16 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
       Alert.alert('Missing Fields', 'Please fill in the title, location, and description.');
       return;
     }
+    
+    let finalLocation = location.trim();
+    if (floor) {
+      if (['1st', '2nd', '3rd'].includes(floor)) {
+        finalLocation += ` (${floor} Floor)`;
+      } else {
+        finalLocation += ` (${floor})`;
+      }
+    }
+
     setLoading(true);
     try {
       // Toxicity check — only when online
@@ -222,7 +235,7 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
         title: title.trim(),
         category,
         severity,
-        location: location.trim(),
+        location: finalLocation,
         description: description.trim(),
         is_anonymous: isAnonymous,
         image_url: null,
@@ -259,6 +272,7 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
           onPress: () => {
             setTitle('');
             setLocation('');
+            setFloor('');
             setDescription('');
             setImageUri(null);
             setLatitude(null);
@@ -340,6 +354,19 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
 
         <Text style={styles.label}>Location / Room #</Text>
         <TextInput style={styles.input} placeholder="e.g., 3rd Floor East Wing or Room 3007" placeholderTextColor={colors.textMuted} value={location} onChangeText={setLocation} />
+
+        <Text style={styles.label}>Floor / Area (Optional)</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryContainer}>
+          {FLOORS.map((f) => (
+            <TouchableOpacity
+              key={f}
+              style={[styles.chip, floor === f && styles.activeChip]}
+              onPress={() => setFloor(floor === f ? '' : f)}
+            >
+              <Text style={[styles.chipText, floor === f && styles.activeChipText]}>{f}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         <View style={styles.locationSection}>
           <View style={styles.gpsToggleRow}>

@@ -14,7 +14,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
 } from 'react-native';
+import MapView, { Marker } from '../components/CustomMapView';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { captureCurrentLocation, submitReport } from '../lib/reportSubmit';
@@ -29,6 +31,7 @@ const SEVERITIES = [
   { label: 'High', color: '#ef4444' },
   { label: 'Crisis', color: '#9333ea' },
 ];
+const FLOORS = ['1st', '2nd', '3rd', 'Greenhouse', 'Outside'];
 
 export default function InstantReportDetailsScreen({
   photoUri,
@@ -49,6 +52,16 @@ export default function InstantReportDetailsScreen({
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [loading, setLoading] = useState(false);
   const [locLoading, setLocLoading] = useState(true);
+  
+  const [floor, setFloor] = useState('');
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [pinCoordinate, setPinCoordinate] = useState(null);
+  const [mapPickerRegion, setMapPickerRegion] = useState({
+    latitude: 55.1707,
+    longitude: -118.7947,
+    latitudeDelta: 0.005,
+    longitudeDelta: 0.005,
+  });
 
   useEffect(() => {
     (async () => {
@@ -71,9 +84,18 @@ export default function InstantReportDetailsScreen({
       Alert.alert('Add a description', 'Tell us briefly what happened.');
       return;
     }
-    if (!location.trim()) {
+    let finalLocation = location.trim();
+    if (!finalLocation) {
       Alert.alert('Location needed', 'Please add where this incident occurred.');
       return;
+    }
+    
+    if (floor) {
+      if (['1st', '2nd', '3rd'].includes(floor)) {
+        finalLocation += ` (${floor} Floor)`;
+      } else {
+        finalLocation += ` (${floor})`;
+      }
     }
 
     setLoading(true);
@@ -82,7 +104,7 @@ export default function InstantReportDetailsScreen({
         title: description.slice(0, 60),
         category,
         severity,
-        location,
+        location: finalLocation,
         description,
         imageUri: photoUri,
         isAnonymous,
@@ -100,6 +122,22 @@ export default function InstantReportDetailsScreen({
     } finally {
       setLoading(false);
     }
+  };
+
+  const confirmMapPin = () => {
+    if (pinCoordinate) {
+      setLatitude(pinCoordinate.latitude);
+      setLongitude(pinCoordinate.longitude);
+    }
+    setShowMapPicker(false);
+  };
+
+  const openMapPicker = () => {
+    if (latitude && longitude) {
+      setMapPickerRegion({ latitude, longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 });
+      setPinCoordinate({ latitude, longitude });
+    }
+    setShowMapPicker(true);
   };
 
   const surfaceBg = isDark ? 'rgba(30, 41, 59, 0.95)' : '#ffffff';
@@ -181,7 +219,14 @@ export default function InstantReportDetailsScreen({
           <Text style={[styles.charCount, { color: colors.textMuted }]}>{description.length}/280</Text>
 
           {/* Location */}
-          <Text style={[styles.label, { color: colors.textBody }]}>Location</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={[styles.label, { color: colors.textBody }]}>Location</Text>
+            {latitude !== null && longitude !== null && (
+              <TouchableOpacity onPress={openMapPicker}>
+                <Text style={{ fontSize: 13, color: '#2563eb', fontWeight: '700' }}>Adjust on Map</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <View style={[styles.locationRow, { backgroundColor: inputBg, borderColor: colors.border }]}>
             <Ionicons name="location" size={18} color="#2563eb" />
             {locLoading ? (
@@ -196,6 +241,20 @@ export default function InstantReportDetailsScreen({
               />
             )}
           </View>
+
+          {/* Floor Number Selector */}
+          <Text style={[styles.label, { color: colors.textBody }]}>Floor / Area (Optional)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+            {FLOORS.map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.chip, floor === f && styles.chipActive]}
+                onPress={() => setFloor(floor === f ? '' : f)}
+              >
+                <Text style={[styles.chipText, floor === f && styles.chipTextActive]}>{f}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
           {/* Anonymous */}
           <View style={styles.anonRow}>
@@ -231,6 +290,36 @@ export default function InstantReportDetailsScreen({
           )}
         </TouchableOpacity>
       </View>
+
+      <Modal visible={showMapPicker} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setShowMapPicker(false)}>
+        <View style={[styles.mapPickerModal, { backgroundColor: colors.background }]}>
+          <View style={[styles.mapPickerHeader, { backgroundColor: colors.surfaceSecondary, borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setShowMapPicker(false)} style={styles.mapPickerClose}>
+              <Ionicons name="close" size={22} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.mapPickerTitle, { color: colors.text }]}>Pin Incident Location</Text>
+            <View style={{ width: 36 }} />
+          </View>
+          <Text style={[styles.mapPickerHint, { backgroundColor: colors.surfaceSecondary, color: colors.textSecondary }]}>Tap anywhere on the map to place a pin</Text>
+          <MapView style={styles.mapPickerMap} initialRegion={mapPickerRegion} onPress={(e) => setPinCoordinate(e.nativeEvent.coordinate)}>
+            {pinCoordinate && (
+              <Marker coordinate={pinCoordinate} draggable onDragEnd={(e) => setPinCoordinate(e.nativeEvent.coordinate)} pinColor="#2563eb" />
+            )}
+          </MapView>
+          <View style={[styles.mapPickerFooter, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+            {pinCoordinate && (
+              <Text style={styles.mapPickerCoords}>
+                <Ionicons name="location" size={13} color={colors.textSecondary} /> {pinCoordinate.latitude.toFixed(5)}, {pinCoordinate.longitude.toFixed(5)}
+              </Text>
+            )}
+            <TouchableOpacity style={[styles.confirmPinBtn, !pinCoordinate && styles.disabledBtn]} onPress={confirmMapPin} disabled={!pinCoordinate}>
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
+              <Text style={styles.confirmPinText}>Confirm Location</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 }
@@ -334,4 +423,15 @@ const styles = StyleSheet.create({
   },
   postBtnDisabled: { opacity: 0.6 },
   postBtnText: { color: '#ffffff', fontSize: 16, fontWeight: '800' },
+  mapPickerModal: { flex: 1 },
+  mapPickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 50, paddingBottom: 12, borderBottomWidth: 1 },
+  mapPickerClose: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  mapPickerTitle: { fontSize: 16, fontWeight: '800' },
+  mapPickerHint: { fontSize: 12, textAlign: 'center', paddingVertical: 8 },
+  mapPickerMap: { flex: 1 },
+  mapPickerFooter: { padding: 16, borderTopWidth: 1, gap: 10 },
+  mapPickerCoords: { fontSize: 12, textAlign: 'center' },
+  confirmPinBtn: { backgroundColor: '#2563eb', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 10, gap: 8 },
+  confirmPinText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  disabledBtn: { opacity: 0.6 },
 });

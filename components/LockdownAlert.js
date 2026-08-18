@@ -41,6 +41,7 @@ export default function LockdownAlert() {
 
   const report = lockdownAlert;
   const photoUri = report.image_url || report.photo_url;
+  const isBle = report._source === 'ble';
 
   return (
     <Modal visible animationType="none" statusBarTranslucent>
@@ -62,6 +63,13 @@ export default function LockdownAlert() {
 
           <Text style={styles.headline}>{t('lockdown.headline')}</Text>
           <Text style={styles.subheadline}>{t('lockdown.subheadline')}</Text>
+
+          {isBle && (
+            <View style={styles.bleBadge}>
+              <Ionicons name="bluetooth" size={13} color="#93c5fd" />
+              <Text style={styles.bleBadgeText}>Detected via Bluetooth — you are very close to this incident</Text>
+            </View>
+          )}
 
           <View style={styles.divider} />
 
@@ -105,6 +113,24 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { alignItems: 'center', paddingHorizontal: 24 },
   iconWrap: { marginBottom: 16 },
+  bleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(37, 99, 235, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(147, 197, 253, 0.5)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginBottom: 18,
+  },
+  bleBadgeText: {
+    fontSize: 12,
+    color: '#93c5fd',
+    fontWeight: '700',
+    flexShrink: 1,
+  },
   headline: {
     fontSize: 32,
     fontWeight: '900',

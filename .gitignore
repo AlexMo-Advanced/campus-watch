@@ -47,3 +47,5 @@ app-example
 *.apk
 *.aab
 keystore-base64.txt
+.vercel
+.env*

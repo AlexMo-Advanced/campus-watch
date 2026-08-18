@@ -45,7 +45,9 @@ export default function ProfileScreen({ navigation }) {
     enabled: proximityEnabled,
     ready: proximityReady,
     bleAvailable,
+    blePermissionsGranted,
     setEnabled: setProximityEnabled,
+    getRecentTokenCount,
   } = useProximity();
   const { lockdownEnabled, setLockdownEnabled } = useLockdown();
   const [consentVisible, setConsentVisible] = useState(false);
@@ -375,11 +377,44 @@ export default function ProfileScreen({ navigation }) {
               }}
             />
           </View>
-          {proximityEnabled && !bleAvailable && (
-            <Text style={[styles.reportPrefHint, { color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 12 }]}>
-              {t('settings.proximityBleHint')}
-            </Text>
+
+          {/* BLE Status Panel — shown when proximity is enabled */}
+          {proximityEnabled && (
+            <>
+              <View style={styles.groupDivider} />
+              <View style={[styles.blePanelRow, { backgroundColor: bleAvailable ? 'rgba(37,99,235,0.08)' : 'rgba(100,116,139,0.07)' }]}>
+                <View style={styles.blePanelLeft}>
+                  <View style={[styles.bleStatusDot, { backgroundColor: bleAvailable ? '#3b82f6' : '#94a3b8' }]} />
+                  <View>
+                    <Text style={[styles.blePanelTitle, { color: colors.text }]}>
+                      {bleAvailable ? '📡 BLE Active — Scanning' : 'Bluetooth Unavailable'}
+                    </Text>
+                    <Text style={[styles.blePanelSub, { color: colors.textSecondary }]}>
+                      {bleAvailable
+                        ? `${getRecentTokenCount()} nearby device${getRecentTokenCount() !== 1 ? 's' : ''} detected`
+                        : 'Enable Bluetooth to detect nearby crises'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name={bleAvailable ? 'bluetooth' : 'bluetooth-outline'}
+                  size={22}
+                  color={bleAvailable ? '#3b82f6' : '#94a3b8'}
+                />
+              </View>
+
+              {/* Permissions warning */}
+              {!blePermissionsGranted && (
+                <View style={styles.blePermWarning}>
+                  <Ionicons name="warning-outline" size={14} color="#f59e0b" />
+                  <Text style={styles.blePermWarningText}>
+                    Bluetooth permissions denied. Go to Settings → Apps → Campus Watch → Permissions to enable.
+                  </Text>
+                </View>
+              )}
+            </>
           )}
+
           <View style={styles.groupDivider} />
           <View style={styles.groupRow}>
             <View style={[styles.rowInfo, styles.rowInfoFlex]}>
@@ -537,4 +572,12 @@ const styles = StyleSheet.create({
   buildPowered: { fontSize: 11, fontWeight: '500', textAlign: 'center' },
   buildVersion: { fontSize: 11, textAlign: 'center' },
   buildCopy: { fontSize: 11, textAlign: 'center' },
+  // BLE status panel
+  blePanelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+  blePanelLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  bleStatusDot: { width: 9, height: 9, borderRadius: 5 },
+  blePanelTitle: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  blePanelSub: { fontSize: 11, lineHeight: 15 },
+  blePermWarning: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 16, paddingBottom: 12 },
+  blePermWarningText: { fontSize: 11, color: '#f59e0b', lineHeight: 15, flex: 1 },
 });

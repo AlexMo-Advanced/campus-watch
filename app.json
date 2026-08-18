@@ -8,11 +8,6 @@
     "scheme": "campuswatch",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "autolinking": {
-      "exclude": [
-        "react-native-ble-plx"
-      ]
-    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
