@@ -28,6 +28,7 @@ import ProximityConsentModal from '../components/ProximityConsentModal';
 import LanguagePickerModal from '../components/LanguagePickerModal';
 import { useProximity } from '../lib/ProximityContext';
 import { useLockdown } from '../lib/LockdownContext';
+import * as Updates from 'expo-updates';
 import { useLanguage } from '../lib/LanguageContext';
 import { useTranslation } from 'react-i18next';
 
@@ -493,6 +494,11 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.rowInfo}>
               <Ionicons name="cloud-download-outline" size={20} color={colors.primary} />
               <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.checkUpdates')}</Text>
+        <View style={{ marginTop: 12, padding: 8, backgroundColor: colors.surface, borderRadius: 8 }}>
+          <Text style={{ color: colors.text, fontSize: 12 }}>Update ID: {Updates.updateId ?? 'n/a'}</Text>
+          <Text style={{ color: colors.text, fontSize: 12 }}>Embedded: {Updates.isEmbeddedLaunch ? 'yes' : 'no'}</Text>
+          <Text style={{ color: colors.text, fontSize: 12 }}>Runtime Version: {Updates.runtimeVersion ?? 'n/a'}</Text>
+        </View>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>

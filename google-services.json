@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "466005287523",
+    "project_id": "campuswatch-34368",
+    "storage_bucket": "campuswatch-34368.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:466005287523:android:bf9ff5a1766cfe348c4e56",
+        "android_client_info": {
+          "package_name": "com.alexmozeyu2011.campuswatch"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByxwWInwgpAjt76ey2CMT08xAOstzjOVA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
