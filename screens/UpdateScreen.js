@@ -179,6 +179,33 @@ export default function UpdateScreen({ navigation }) {
             <Ionicons name="information-circle-outline" size={14} color={colors.textMuted} />
             <Text style={[styles.versionText, { color: colors.textMuted }]}>Version 1.0.0 · CampusWatch</Text>
           </View>
+
+          {/* Build / OTA info */}
+          <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.infoRow}>
+              <Ionicons name="finger-print-outline" size={13} color={colors.textMuted} />
+              <Text style={[styles.infoLabel, { color: colors.textMuted }]}>Update ID</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]} numberOfLines={1} ellipsizeMode="middle">
+                {Updates.updateId ?? 'n/a'}
+              </Text>
+            </View>
+            <View style={[styles.infoRowDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.infoRow}>
+              <Ionicons name="layers-outline" size={13} color={colors.textMuted} />
+              <Text style={[styles.infoLabel, { color: colors.textMuted }]}>Embedded</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>
+                {Updates.isEmbeddedLaunch ? 'Yes' : 'No'}
+              </Text>
+            </View>
+            <View style={[styles.infoRowDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.infoRow}>
+              <Ionicons name="code-slash-outline" size={13} color={colors.textMuted} />
+              <Text style={[styles.infoLabel, { color: colors.textMuted }]}>Runtime Version</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>
+                {Updates.runtimeVersion ?? 'n/a'}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Action buttons */}
@@ -269,6 +296,23 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   versionText: { fontSize: 12, fontWeight: '500' },
+  infoCard: {
+    width: '100%',
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  infoRowDivider: { height: StyleSheet.hairlineWidth, marginLeft: 14 },
+  infoLabel: { fontSize: 12, fontWeight: '600', flex: 1 },
+  infoValue: { fontSize: 12, fontWeight: '400', flexShrink: 1, maxWidth: '55%', textAlign: 'right' },
   actions: { gap: 12 },
   primaryBtn: {
     flexDirection: 'row',

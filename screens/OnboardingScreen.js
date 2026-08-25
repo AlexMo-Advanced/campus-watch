@@ -2,16 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
@@ -23,7 +24,7 @@ const SCHOOLS = [
 
 export default function OnboardingScreen({ onComplete }) {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [fullName, setFullName] = useState('');
   const [classrooms, setClassrooms] = useState(['']);
   const [selectedSchool, setSelectedSchool] = useState(null);
@@ -136,18 +137,33 @@ export default function OnboardingScreen({ onComplete }) {
                 activeOpacity={0.8}
               >
                 <View style={styles.schoolOptionLeft}>
-                  <View style={[styles.schoolIconBadge, selectedSchool === school.id && { backgroundColor: '#2563eb' }]}>
-                    <Ionicons name="school" size={18} color={selectedSchool === school.id ? '#fff' : '#2563eb'} />
+                  <View style={[
+                    styles.schoolIconBadge,
+                    {
+                      backgroundColor: isDark ? '#431407' : '#dbeafe',
+                      borderWidth: 0,
+                    },
+                    selectedSchool === school.id && {
+                      backgroundColor: isDark ? '#7c2d12' : '#fff3e0',
+                      borderColor: '#f97316',
+                      borderWidth: 1.5,
+                    }
+                  ]}>
+                    <Image
+                      source={require('../assets/images/gpchs-logo.png')}
+                      style={styles.schoolLogo}
+                      resizeMode="contain"
+                    />
                   </View>
                   <View style={styles.schoolTextGroup}>
-                    <Text style={[styles.schoolLabel, { color: colors.text }, selectedSchool === school.id && { color: '#2563eb', fontWeight: '800' }]}>
+                    <Text style={[styles.schoolLabel, { color: colors.text }, selectedSchool === school.id && { color: colors.primary, fontWeight: '800' }]}>
                       {school.label}
                     </Text>
-                    <Text style={[styles.schoolShort, { color: colors.textMuted }]}>{school.short}</Text>
+                    <Text style={[styles.schoolShort, { color: colors.textMuted }]}>{school.short} · Grande Prairie, AB</Text>
                   </View>
                 </View>
                 {selectedSchool === school.id && (
-                  <Ionicons name="checkmark-circle" size={22} color="#2563eb" />
+                  <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
                 )}
               </TouchableOpacity>
             ))}
@@ -243,13 +259,15 @@ const styles = StyleSheet.create({
   schoolOptionActive: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
   schoolOptionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   schoolIconBadge: {
-    width: 38,
-    height: 38,
+    width: 44,
+    height: 44,
     borderRadius: 10,
     backgroundColor: '#dbeafe',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
+  schoolLogo: { width: 40, height: 40 },
   schoolTextGroup: { flex: 1 },
   schoolLabel: { fontSize: 14, fontWeight: '600' },
   schoolShort: { fontSize: 11, marginTop: 2 },

@@ -1,36 +1,43 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import LanguagePickerModal from '../components/LanguagePickerModal';
+import NotificationInboxPanel from '../components/NotificationInboxPanel';
+import ProximityConsentModal from '../components/ProximityConsentModal';
+import { useHaptics } from '../lib/HapticsContext';
+import { useLanguage } from '../lib/LanguageContext';
+import { useLockdown } from '../lib/LockdownContext';
+import { useProximity } from '../lib/ProximityContext';
+import { useReportMode } from '../lib/ReportModeContext';
 import {
   REPORT_MODE_INSTANT,
   REPORT_MODE_STANDARD,
 } from '../lib/reportPreferences';
-import { useReportMode } from '../lib/ReportModeContext';
+import { useSounds } from '../lib/SoundsContext';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/ThemeContext';
-import { useHaptics } from '../lib/HapticsContext';
-import { useSounds } from '../lib/SoundsContext';
-import NotificationInboxPanel from '../components/NotificationInboxPanel';
-import ProximityConsentModal from '../components/ProximityConsentModal';
-import LanguagePickerModal from '../components/LanguagePickerModal';
-import { useProximity } from '../lib/ProximityContext';
-import { useLockdown } from '../lib/LockdownContext';
-import * as Updates from 'expo-updates';
-import { useLanguage } from '../lib/LanguageContext';
-import { useTranslation } from 'react-i18next';
+
+const GPCHS_SCHOOL_INFO = {
+  id: 'gpchs',
+  name: 'Grande Prairie Composite High School',
+  short: 'GPCHS',
+  location: 'Grande Prairie, AB',
+  mascot: 'Phoenix',
+};
 
 export default function ProfileScreen({ navigation }) {
   const { isDark, colors, setDarkMode, dynamicGradients, setDynamicGradients, themeMode, setThemeMode } = useTheme();
@@ -250,6 +257,35 @@ export default function ProfileScreen({ navigation }) {
         <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile} disabled={loading}>
           {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.saveBtnText}>{t('settings.saveProfile')}</Text>}
         </TouchableOpacity>
+
+        {/* ── SCHOOL ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>School</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+          <View style={styles.schoolProfileRow}>
+            <View style={[
+              styles.schoolProfileLogoBadge,
+              {
+                backgroundColor: isDark ? '#431407' : '#fff7ed',
+                borderColor: isDark ? '#7c2d12' : '#fed7aa',
+              }
+            ]}>
+              <Image
+                source={require('../assets/images/gpchs-logo.png')}
+                style={styles.schoolProfileLogo}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.schoolProfileInfo}>
+              <Text style={[styles.schoolProfileName, { color: colors.text }]}>{GPCHS_SCHOOL_INFO.name}</Text>
+              <Text style={[styles.schoolProfileShort, { color: colors.primary, fontWeight: '800' }]}>
+                {GPCHS_SCHOOL_INFO.short} · {GPCHS_SCHOOL_INFO.mascot} 🐦‍🔥
+              </Text>
+              <Text style={[styles.schoolProfileLocation, { color: colors.textSecondary }]}>
+                <Ionicons name="location-outline" size={12} color={colors.textSecondary} /> {GPCHS_SCHOOL_INFO.location}
+              </Text>
+            </View>
+          </View>
+        </View>
 
         {/* ── APP LANGUAGE ── */}
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('language.title')}</Text>
@@ -494,11 +530,6 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.rowInfo}>
               <Ionicons name="cloud-download-outline" size={20} color={colors.primary} />
               <Text style={[styles.rowLabel, { color: colors.text }]}>{t('settings.checkUpdates')}</Text>
-        <View style={{ marginTop: 12, padding: 8, backgroundColor: colors.surface, borderRadius: 8 }}>
-          <Text style={{ color: colors.text, fontSize: 12 }}>Update ID: {Updates.updateId ?? 'n/a'}</Text>
-          <Text style={{ color: colors.text, fontSize: 12 }}>Embedded: {Updates.isEmbeddedLaunch ? 'yes' : 'no'}</Text>
-          <Text style={{ color: colors.text, fontSize: 12 }}>Runtime Version: {Updates.runtimeVersion ?? 'n/a'}</Text>
-        </View>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
@@ -573,6 +604,24 @@ const styles = StyleSheet.create({
   // Save button
   saveBtn: { width: '100%', backgroundColor: '#2563eb', padding: 15, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 15 },
+  // School section
+  schoolProfileRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 14 },
+  schoolProfileLogoBadge: {
+    width: 58,
+    height: 58,
+    borderRadius: 16,
+    backgroundColor: '#fff7ed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: '#fed7aa',
+  },
+  schoolProfileLogo: { width: 52, height: 52 },
+  schoolProfileInfo: { flex: 1 },
+  schoolProfileName: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  schoolProfileShort: { fontSize: 12, marginBottom: 4, letterSpacing: 0.3 },
+  schoolProfileLocation: { fontSize: 12, flexDirection: 'row', alignItems: 'center' },
   // Build info
   buildInfo: { alignItems: 'center', marginTop: 32, marginBottom: 16, gap: 4 },
   buildPowered: { fontSize: 11, fontWeight: '500', textAlign: 'center' },

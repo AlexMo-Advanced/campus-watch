@@ -3,11 +3,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
-
   ActivityIndicator,
 
   Alert,
-
   RefreshControl,
 
   StyleSheet,
@@ -16,8 +14,7 @@ import {
 
   TouchableOpacity,
 
-  View,
-
+  View
 } from 'react-native';
 
 import { ScrollView } from 'react-native-gesture-handler';
@@ -37,7 +34,6 @@ import DashboardEditableGrid from '../components/dashboard/DashboardEditableGrid
 import WidgetTrashBin from '../components/dashboard/WidgetTrashBin';
 
 import {
-
   createWidget,
 
   loadDashboardLayout,
@@ -45,7 +41,6 @@ import {
   resetDashboardLayout,
 
   saveDashboardLayout,
-
 } from '../lib/dashboardLayout';
 
 import { generateCampusReport } from '../lib/gemini';
@@ -655,6 +650,7 @@ export default function DashboardScreen({ navigation }) {
         }
 
       >
+
 
         <View style={styles.headerRow}>
 

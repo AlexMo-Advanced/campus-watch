@@ -212,13 +212,6 @@ Deno.serve(async (req) => {
       sound?: string;
     }> = [];
 
-    const notificationRows: Array<{
-      report_id: string;
-      user_id: string;
-      priority: string;
-      nearby: boolean;
-    }> = [];
-
     for (const pushRow of pushRows ?? []) {
       const uid = pushRow.user_id;
       if (!uid || !pushRow.token) continue;
@@ -226,14 +219,23 @@ Deno.serve(async (req) => {
       if (!priority) continue;
 
       const isNearbyBleCrisis = priority === 'crisis';
+      const isNearby = isNearbyBleCrisis || priority === 'critical' || priority === 'high';
 
+      // Insert the notification row and retrieve its ID so the client can
+      // acknowledge it when the user presses "Got It" on the lockdown screen.
+      let reportNotificationId: string | null = null;
       if (uid !== user.id) {
-        notificationRows.push({
-          report_id: report.id,
-          user_id: uid,
-          priority,
-          nearby: isNearbyBleCrisis || priority === 'critical' || priority === 'high',
-        });
+        const { data: inserted } = await admin
+          .from('report_notifications')
+          .insert({
+            report_id: report.id,
+            user_id: uid,
+            priority,
+            nearby: isNearby,
+          })
+          .select('id')
+          .single();
+        reportNotificationId = inserted?.id ?? null;
       }
 
       if (uid === user.id) continue;
@@ -242,20 +244,16 @@ Deno.serve(async (req) => {
         to: pushRow.token,
         title: titleForPriority(priority, report.title),
         body: bodyForPriority(priority, report.title, report.location),
-        sound: priority === 'crisis' || priority === 'critical' || priority === 'high' ? 'alert.wav' : 'alert.wav',
+        sound: 'alert.wav',
         data: {
           reportId: report.id,
           priority,
-          nearby: isNearbyBleCrisis || priority === 'critical' || priority === 'high',
+          nearby: isNearby,
           lockdown: isNearbyBleCrisis,
+          reportNotificationId,
         },
       });
     }
-
-    if (notificationRows.length) {
-      await admin.from('report_notifications').insert(notificationRows);
-    }
-
     await sendExpoPush(pushMessages);
 
     return new Response(JSON.stringify({ notified: pushMessages.length }), {

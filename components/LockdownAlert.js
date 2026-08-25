@@ -14,6 +14,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLockdown } from '../lib/LockdownContext';
+import { supabase } from '../lib/supabase';
 
 export default function LockdownAlert() {
   const { lockdownAlert, dismissLockdown } = useLockdown();
@@ -21,6 +22,21 @@ export default function LockdownAlert() {
   const insets = useSafeAreaInsets();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const handleGotIt = async () => {
+    const notifId = lockdownAlert?._reportNotificationId;
+    if (notifId) {
+      try {
+        await supabase
+          .from('report_notifications')
+          .update({ acknowledged_at: new Date().toISOString() })
+          .eq('id', notifId);
+      } catch {
+        // silent — don't block dismiss if ack fails
+      }
+    }
+    dismissLockdown();
+  };
 
   useEffect(() => {
     if (!lockdownAlert) return;
@@ -98,7 +114,7 @@ export default function LockdownAlert() {
             ) : null}
           </View>
 
-          <TouchableOpacity style={styles.gotItBtn} onPress={dismissLockdown} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.gotItBtn} onPress={handleGotIt} activeOpacity={0.85}>
             <Text style={styles.gotItText}>{t('lockdown.gotIt')}</Text>
           </TouchableOpacity>
 
@@ -209,12 +225,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   gotItBtn: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    paddingHorizontal: 56,
+    paddingVertical: 18,
+    borderRadius: 50,
     backgroundColor: '#2563eb',
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignSelf: 'center',
     shadowColor: '#1d4ed8',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.6,
@@ -223,7 +238,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   gotItText: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: '#ffffff',
     letterSpacing: 0.5,

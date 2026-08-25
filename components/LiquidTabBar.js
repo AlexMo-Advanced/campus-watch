@@ -268,7 +268,7 @@ export default function FloatingTabBar({ state, navigation }) {
   }));
 
   const ambientColor = colors.backgroundGradient?.[colors.backgroundGradient.length - 1] || colors.background;
-  const glassTintColor = isDark ? hexToRgba(ambientColor, 0.82) : colors.tabBarGlass;
+  const glassTintColor = colors.tabBarGlass;
   const blurTint = colors.tabBarBlur;
   const specularColors = isDark
     ? [hexToRgba(colors.primary, 0.14), hexToRgba(ambientColor, 0.06), 'rgba(0,0,0,0)']

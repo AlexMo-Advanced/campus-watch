@@ -1,43 +1,66 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
-import {
-    ActionSheetIOS,
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import MapView, { Marker } from '../components/CustomMapView';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  ActionSheetIOS,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Animated, {
+  Extrapolation,
+  FadeInDown,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CommentSection from '../components/CommentSection';
+import DashboardSection from '../components/DashboardSection';
+import MapView, { Marker } from '../components/CustomMapView';
 import ReportLikeButton from '../components/ReportLikeButton';
 import ShareReportSheet from '../components/ShareReportSheet';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../lib/supabase';
-import { NOTIFICATION_TYPES } from '../lib/notifications';
+import { useNetwork } from '../lib/NetworkContext';
 import { useNotifications } from '../lib/NotificationContext';
 import { useTabBarScrollHandler } from '../lib/TabBarScrollContext';
-import { getTabBarClearance } from '../lib/tabBarLayout';
-import { useAppTheme } from '../hooks/useAppTheme';
 import { useTheme } from '../lib/ThemeContext';
+import { NOTIFICATION_TYPES } from '../lib/notifications';
+import { supabase } from '../lib/supabase';
+import { getTabBarClearance } from '../lib/tabBarLayout';
 import { getSeverityGradient } from '../lib/theme';
-import { useNetwork } from '../lib/NetworkContext';
-import { useTranslation } from 'react-i18next';
+
+
+// Circle (66) + label (~20) + paddingTop (10) + marginBottom (10) + border = ~110
+const FILTER_HEIGHT = 110;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const { onScroll, scrollEventThrottle } = useTabBarScrollHandler();
+  const lastScrollY = useSharedValue(0);
+  const filterVisible = useSharedValue(1); // 1 = visible, 0 = hidden
+
+  const filterAnimatedStyle = useAnimatedStyle(() => {
+    const height = withTiming(
+      interpolate(filterVisible.value, [0, 1], [0, FILTER_HEIGHT], Extrapolation.CLAMP),
+      { duration: 250 }
+    );
+    const opacity = withTiming(filterVisible.value, { duration: 200 });
+    return { height, opacity, overflow: 'hidden' };
+  });
+
   const { notifySelfAction, checkNearbyReports } = useNotifications();
   const tabBarPadding = getTabBarClearance(insets);
   const { isDark, colors: themeColors } = useTheme();
@@ -424,17 +447,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Custom Header with Archive Toggle */}
-      <View style={styles.feedHeader}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <TouchableOpacity onPress={toggleFeedMode} style={styles.archiveToggleBtn}>
-            <Ionicons name={feedMode === 'Archive' ? 'archive' : 'archive-outline'} size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <Text style={styles.feedHeaderTitle}>{feedMode === 'Active' ? 'Campus Feed' : 'Archived Alerts'}</Text>
-        </View>
-      </View>
-
-      <View style={styles.filterSection}>
+      <Animated.View style={[styles.filterSection, filterAnimatedStyle]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storyScroll}>
           {/* Posted By Me Story */}
           <TouchableOpacity 
@@ -492,15 +505,26 @@ export default function HomeScreen() {
             <Text style={[styles.storyText, severityFilter === 'Crisis' && { color: colors.crisis, fontWeight: '700' }]}>Crisis</Text>
           </TouchableOpacity>
         </ScrollView>
-      </View>
+      </Animated.View>
 
       <FlatList
         data={getFilteredReports()}
         keyExtractor={(item) => String(item.id)}
+        ListHeaderComponent={<DashboardSection userId={currentUser?.id} colors={colors} />}
         renderItem={renderItem}
         contentContainerStyle={[styles.listContent, { paddingBottom: tabBarPadding }]}
-        onScroll={onScroll}
-        scrollEventThrottle={scrollEventThrottle}
+        onScroll={(e) => {
+          onScroll(e);
+          const currentY = e.nativeEvent.contentOffset.y;
+          const delta = currentY - lastScrollY.value;
+          if (delta > 20 && currentY > 40) {
+            filterVisible.value = 0;
+          } else if (delta < -10) {
+            filterVisible.value = 1;
+          }
+          lastScrollY.value = currentY;
+        }}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -761,10 +785,9 @@ const getStyles = (colors) => StyleSheet.create({
   container: { flex: 1 },
   offlineBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#92400e', paddingVertical: 6 },
   offlineBarText: { color: '#fef3c7', fontSize: 12, fontWeight: '600' },
-  feedHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-  feedHeaderTitle: { fontSize: 24, fontWeight: '800', color: colors.textMain },
+  feedHeader: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, flexDirection: 'row', alignItems: 'center' },
   archiveToggleBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryBg, justifyContent: 'center', alignItems: 'center' },
-  filterSection: { paddingHorizontal: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
+  filterSection: { paddingHorizontal: 16, paddingTop: 10, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
   storyScroll: { flexDirection: 'row', marginBottom: 10 },
   storyContainer: { alignItems: 'center', marginRight: 16, width: 66 },
   storyCircle: { width: 66, height: 66, borderRadius: 33, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center', overflow: 'hidden', padding: 2 },

@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -12,11 +12,10 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View,
+  View
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/ThemeContext';
-import { useTranslation } from 'react-i18next';
 
 // TouchableWithoutFeedback doesn't play well with RN Web — it ends up
 // capturing pointer events meant for children (inputs, buttons), so on

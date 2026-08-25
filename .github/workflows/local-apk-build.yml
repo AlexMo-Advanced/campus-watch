@@ -1,0 +1,65 @@
+name: Local Android APK Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Local EAS Android Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        
+      - name: Accept Android SDK Licenses & Install NDK
+        run: |
+          yes | sdkmanager --licenses
+          sudo apt-get install -y p7zip-full
+          sdkmanager "ndk;26.1.10909125"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Local EAS Build
+        run: eas build --local --platform android --profile production --non-interactive --output ./build/app.apk
+        env:
+          EAS_LOCAL_BUILD_SKIP_CLEANUP: "1"
+          EAS_NO_VCS: "1"
+
+      - name: Find and Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: campus-watch-release-apk
+          path: ./build/app.apk
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./build/app.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
