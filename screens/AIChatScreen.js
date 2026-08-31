@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
@@ -221,7 +222,7 @@ function ChatLoadingScreen({ isDark, colors }) {
 
   return (
     <View style={styles.loadingContent}>
-      <Animated.View entering={FadeInUp.duration(500)} style={styles.loadingHero}>
+      <Animated.View entering={FadeInUp.springify()} style={styles.loadingHero}>
         <View style={styles.loadingHeroRingWrap}>
           <Animated.View style={[styles.loadingHeroRing, ringStyle]}>
             <LinearGradient
@@ -242,7 +243,7 @@ function ChatLoadingScreen({ isDark, colors }) {
       {[0, 1, 2].map((i) => (
         <Animated.View
           key={i}
-          entering={FadeInLeft.delay(200 + i * 120).duration(400)}
+          entering={FadeInLeft.delay(200 + i * 120).springify()}
           style={[styles.loadingBubble, { backgroundColor: bubbleBg, borderColor: isDark ? '#334155' : '#e2e8f0' }]}
         >
           <Animated.View style={[styles.loadingLine, shimmerStyle, { width: `${90 - i * 15}%`, backgroundColor: lineBg }]} />
@@ -251,6 +252,7 @@ function ChatLoadingScreen({ isDark, colors }) {
       ))}
 
       <Animated.View entering={FadeIn.delay(700).duration(400)} style={styles.loadingFooter}>
+        <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
         <TypingDots color="#2563eb" />
         <Text style={[styles.loadingFooterText, { color: colors.textSecondary }]}>Syncing live reports</Text>
       </Animated.View>
@@ -331,11 +333,14 @@ function AnimatedInputBar({
 
   return (
     <Animated.View
-      entering={FadeInUp.delay(300).duration(400)}
+      entering={FadeInUp.delay(300).springify()}
       style={[
         styles.inputBarOuter,
         barStyle,
-        { backgroundColor: inputBarBg, borderTopColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(226, 232, 240, 0.8)' },
+        { borderColor: isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 0.6)' },
+      ]}
+    >
+      <BlurView intensity={isDark ? 40 : 80} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFillObject, { borderRadius: 24 }]} />
       ]}
     >
       <Animated.View style={[styles.inputGlowRing, glowStyle]} pointerEvents="none">
@@ -528,7 +533,7 @@ export default function AIChatScreen({ navigation }) {
 
   const renderMessage = ({ item, index }) => {
     const isUser = item.role === 'user';
-    const anim = isUser ? FadeInRight.duration(300).springify() : FadeInLeft.delay(index === 0 ? 200 : 0).duration(300).springify();
+    const anim = isUser ? FadeInRight.springify().springify() : FadeInLeft.delay(index === 0 ? 200 : 0).springify().springify();
     return (
       <Animated.View entering={anim} style={[styles.messageRow, isUser && styles.messageRowUser]}>
         {!isUser && (
@@ -540,8 +545,9 @@ export default function AIChatScreen({ navigation }) {
           styles.bubble,
           isUser
             ? [styles.bubbleUser, { backgroundColor: '#2563eb' }]
-            : [styles.bubbleAI, { backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.92)', borderColor: isDark ? '#334155' : '#e2e8f0' }],
+            : [styles.bubbleAI, { backgroundColor: isDark ? 'rgba(30, 41, 59, 0.4)' : 'rgba(255, 255, 255, 0.5)', borderColor: isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 0.6)', overflow: 'hidden' }],
         ]}>
+          {!isUser && <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />}
           <Text style={[styles.bubbleText, { color: isUser ? '#ffffff' : (isDark ? '#e2e8f0' : '#0f172a') }]}>
             {renderText(item.parts)}
           </Text>
@@ -551,12 +557,27 @@ export default function AIChatScreen({ navigation }) {
   };
 
   const TypingIndicator = () => (
-    <Animated.View entering={FadeInLeft.duration(200)} style={styles.messageRow}>
+    <Animated.View entering={FadeInLeft.springify()} style={styles.messageRow}>
       <View style={[styles.aiAvatar, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}>
         <Ionicons name="sparkles" size={14} color="#2563eb" />
       </View>
-      <View style={[styles.bubble, styles.bubbleAI, styles.typingBubble, { backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.92)', borderColor: isDark ? '#334155' : '#e2e8f0' }]}>
-        <TypingDots color="#2563eb" />
+      <View style={{ gap: 6 }}>
+        <Animated.View entering={FadeInUp.delay(100).springify()} style={styles.resourceStep}>
+          <Ionicons name="location-outline" size={12} color={colors.textSecondary} />
+          <Text style={[styles.resourceStepText, { color: colors.textSecondary }]}>Accessing Live Location...</Text>
+        </Animated.View>
+        <Animated.View entering={FadeInUp.delay(800).springify()} style={styles.resourceStep}>
+          <Ionicons name="document-text-outline" size={12} color={colors.textSecondary} />
+          <Text style={[styles.resourceStepText, { color: colors.textSecondary }]}>Fetching Campus Reports...</Text>
+        </Animated.View>
+        <Animated.View entering={FadeInUp.delay(1500).springify()} style={styles.resourceStep}>
+          <Ionicons name="analytics-outline" size={12} color={colors.textSecondary} />
+          <Text style={[styles.resourceStepText, { color: colors.textSecondary }]}>Analyzing Context...</Text>
+        </Animated.View>
+        <View style={[styles.bubble, styles.bubbleAI, styles.typingBubble, { backgroundColor: isDark ? 'rgba(30, 41, 59, 0.4)' : 'rgba(255, 255, 255, 0.5)', borderColor: isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 0.6)', overflow: 'hidden', alignSelf: 'flex-start' }]}>
+          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
+          <TypingDots color="#2563eb" />
+        </View>
       </View>
     </Animated.View>
   );
@@ -578,7 +599,7 @@ export default function AIChatScreen({ navigation }) {
 
       <View style={styles.flex}>
         <Animated.View
-          entering={FadeInDown.duration(350)}
+          entering={FadeInDown.springify()}
           style={[styles.header, { paddingTop: insets.top + 4, backgroundColor: headerBg, borderBottomColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(226, 232, 240, 0.8)' }]}
         >
           <TouchableOpacity style={styles.backBtn} onPress={handleBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -614,7 +635,7 @@ export default function AIChatScreen({ navigation }) {
             />
 
             {showSuggestions && (
-              <Animated.View entering={FadeInDown.duration(400)} style={styles.suggestionsWrapper}>
+              <Animated.View entering={FadeInDown.springify()} style={styles.suggestionsWrapper}>
                 <Text style={[styles.suggestionsLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>Try asking:</Text>
                 <View style={styles.suggestionsRow}>
                   {SUGGESTED_PROMPTS.map((prompt, i) => (
@@ -670,6 +691,10 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    marginHorizontal: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
@@ -717,6 +742,9 @@ const styles = StyleSheet.create({
   suggestionChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1 },
   suggestionChipText: { fontSize: 12, fontWeight: '600' },
   inputBarOuter: {
+    borderRadius: 24,
+    marginHorizontal: 12,
+    overflow: 'hidden',
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 10,
     paddingHorizontal: 12,
@@ -764,4 +792,6 @@ const styles = StyleSheet.create({
   loadingLine: { height: 10, borderRadius: 5 },
   loadingFooter: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, paddingLeft: 4 },
   loadingFooterText: { fontSize: 13, fontWeight: '500', fontStyle: 'italic' },
+  resourceStep: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },
+  resourceStepText: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
 });

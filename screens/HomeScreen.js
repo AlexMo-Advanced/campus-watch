@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -29,9 +30,11 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CommentSection from '../components/CommentSection';
 import DashboardSection from '../components/DashboardSection';
+import ImmersiveFeed from '../components/feed/ImmersiveFeed';
 import MapView, { Marker } from '../components/CustomMapView';
 import ReportLikeButton from '../components/ReportLikeButton';
 import ShareReportSheet from '../components/ShareReportSheet';
+import { useFeedViewMode } from '../lib/FeedViewModeContext';
 import { useNetwork } from '../lib/NetworkContext';
 import { useNotifications } from '../lib/NotificationContext';
 import { useTabBarScrollHandler } from '../lib/TabBarScrollContext';
@@ -51,6 +54,7 @@ export default function HomeScreen() {
   const { onScroll, scrollEventThrottle } = useTabBarScrollHandler();
   const lastScrollY = useSharedValue(0);
   const filterVisible = useSharedValue(1); // 1 = visible, 0 = hidden
+  const { mode: feedViewMode } = useFeedViewMode();
 
   const filterAnimatedStyle = useAnimatedStyle(() => {
     const height = withTiming(
@@ -109,6 +113,8 @@ export default function HomeScreen() {
   const [timeFilter, setTimeFilter] = useState('All Time'); // All Time, 24h, 7d
   const [severityFilter, setSeverityFilter] = useState('All'); // All, High, Medium, Low
   const [postedByMe, setPostedByMe] = useState(false);
+  const [nearbyFilter, setNearbyFilter] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -121,6 +127,39 @@ export default function HomeScreen() {
     showToast(`Switched to ${newMode}`);
   };
 
+  const toRad = (d) => (d * Math.PI) / 180;
+  const isNearby = (r, uLat, uLng) => {
+    if (!r.latitude || !r.longitude) return false;
+    const dLat = toRad(r.latitude - uLat);
+    const dLng = toRad(r.longitude - uLng);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(uLat)) * Math.cos(toRad(r.latitude)) * Math.sin(dLng / 2) ** 2;
+    const dist = 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return dist <= 1000;
+  };
+
+  const handleNearbyToggle = async () => {
+    if (!nearbyFilter) {
+      if (!userLocation) {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+            setNearbyFilter(true);
+          } else {
+            Alert.alert('Permission Denied', 'Enable location access to use the Nearby filter.');
+          }
+        } catch (err) {
+          Alert.alert('Location Error', 'Could not get your current location.');
+        }
+      } else {
+        setNearbyFilter(true);
+      }
+    } else {
+      setNearbyFilter(false);
+    }
+  };
+
   const getLatestImage = (filterType) => {
     let match = null;
     if (filterType === 'Posted By Me') {
@@ -130,6 +169,8 @@ export default function HomeScreen() {
       match = reports.find(r => (now - new Date(r.created_at)) <= 24 * 60 * 60 * 1000 && r.image_url);
     } else if (filterType === 'High' || filterType === 'Crisis') {
       match = reports.find(r => r.severity === filterType && r.image_url);
+    } else if (filterType === 'Nearby' && userLocation) {
+      match = reports.find(r => isNearby(r, userLocation.latitude, userLocation.longitude) && r.image_url);
     }
     return match ? match.image_url : null;
   };
@@ -332,6 +373,11 @@ export default function HomeScreen() {
       // Posted By Me Filter
       if (postedByMe && r.user_id !== currentUser?.id) return false;
 
+      // Nearby Filter
+      if (nearbyFilter && userLocation) {
+        if (!isNearby(r, userLocation.latitude, userLocation.longitude)) return false;
+      }
+
       // Time Filter (only relevant in Active mode)
       if (feedMode === 'Active') {
         const reportDate = new Date(r.created_at);
@@ -447,8 +493,75 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <Animated.View style={[styles.filterSection, filterAnimatedStyle]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storyScroll}>
+      {/* Filter bar — circles in List mode, text chips in Immersive mode */}
+      {feedViewMode === 'immersive' ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.immersiveFilterBar}
+          contentContainerStyle={styles.immersiveFilterBarContent}
+        >
+          <TouchableOpacity
+            style={[styles.immersiveChip, nearbyFilter && styles.immersiveChipActive]}
+            onPress={handleNearbyToggle}
+          >
+            <Text style={[styles.immersiveChipText, nearbyFilter && styles.immersiveChipTextActive]}>
+              {t('feed.nearby') || 'Nearby'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.immersiveChip, postedByMe && styles.immersiveChipActive]}
+            onPress={() => setPostedByMe(!postedByMe)}
+          >
+            <Text style={[styles.immersiveChipText, postedByMe && styles.immersiveChipTextActive]}>
+              {t('feed.postedByMe')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.immersiveChip, timeFilter === '24h' && styles.immersiveChipActive]}
+            onPress={() => setTimeFilter(timeFilter === '24h' ? 'All Time' : '24h')}
+          >
+            <Text style={[styles.immersiveChipText, timeFilter === '24h' && styles.immersiveChipTextActive]}>
+              {t('feed.last24h')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.immersiveChip, severityFilter === 'High' && styles.immersiveChipActiveDanger]}
+            onPress={() => setSeverityFilter(severityFilter === 'High' ? 'All' : 'High')}
+          >
+            <Text style={[styles.immersiveChipText, severityFilter === 'High' && styles.immersiveChipTextActive]}>
+              High
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.immersiveChip, severityFilter === 'Crisis' && styles.immersiveChipActiveCrisis]}
+            onPress={() => setSeverityFilter(severityFilter === 'Crisis' ? 'All' : 'Crisis')}
+          >
+            <Text style={[styles.immersiveChipText, severityFilter === 'Crisis' && styles.immersiveChipTextActive]}>
+              Crisis
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      ) : (
+        <Animated.View style={[styles.filterSection, filterAnimatedStyle]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storyScroll}>
+          {/* Nearby Story */}
+          <TouchableOpacity 
+            style={styles.storyContainer} 
+            onPress={handleNearbyToggle}>
+            <View style={[styles.storyCircle, nearbyFilter && { borderColor: colors.primary }]}>
+              {getLatestImage('Nearby') ? (
+                <Image source={{ uri: getLatestImage('Nearby') }} style={styles.storyImage} />
+              ) : (
+                <Ionicons name="location" size={24} color={nearbyFilter ? colors.primary : colors.icon} />
+              )}
+            </View>
+            <Text style={[styles.storyText, nearbyFilter && { color: colors.primary, fontWeight: '700' }]}>{t('feed.nearby') || 'Nearby'}</Text>
+          </TouchableOpacity>
           {/* Posted By Me Story */}
           <TouchableOpacity 
             style={styles.storyContainer} 
@@ -506,36 +619,41 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </ScrollView>
       </Animated.View>
+      )}
 
-      <FlatList
-        data={getFilteredReports()}
-        keyExtractor={(item) => String(item.id)}
-        ListHeaderComponent={<DashboardSection userId={currentUser?.id} colors={colors} />}
-        renderItem={renderItem}
-        contentContainerStyle={[styles.listContent, { paddingBottom: tabBarPadding }]}
-        onScroll={(e) => {
-          onScroll(e);
-          const currentY = e.nativeEvent.contentOffset.y;
-          const delta = currentY - lastScrollY.value;
-          if (delta > 20 && currentY > 40) {
-            filterVisible.value = 0;
-          } else if (delta < -10) {
-            filterVisible.value = 1;
+      {feedViewMode === 'immersive' ? (
+        <ImmersiveFeed reports={getFilteredReports()} />
+      ) : (
+        <FlatList
+          data={getFilteredReports()}
+          keyExtractor={(item) => String(item.id)}
+          ListHeaderComponent={<DashboardSection userId={currentUser?.id} colors={colors} />}
+          renderItem={renderItem}
+          contentContainerStyle={[styles.listContent, { paddingBottom: tabBarPadding }]}
+          onScroll={(e) => {
+            onScroll(e);
+            const currentY = e.nativeEvent.contentOffset.y;
+            const delta = currentY - lastScrollY.value;
+            if (delta > 20 && currentY > 40) {
+              filterVisible.value = 0;
+            } else if (delta < -10) {
+              filterVisible.value = 1;
+            }
+            lastScrollY.value = currentY;
+          }}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              tintColor={colors.primary}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchReports();
+              }}
+            />
           }
-          lastScrollY.value = currentY;
-        }}
-        scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            tintColor={colors.primary}
-            onRefresh={() => {
-              setRefreshing(true);
-              fetchReports();
-            }}
-          />
-        }
-      />
+        />
+      )}
 
       {/* Action Menu Modal */}
       <Modal visible={!!actionMenuReport} transparent animationType="fade" onRequestClose={() => setActionMenuReport(null)}>
@@ -866,4 +984,37 @@ const getStyles = (colors) => StyleSheet.create({
   toastContainer: { position: 'absolute', top: 60, left: 0, right: 0, alignItems: 'center', zIndex: 9999 },
   toastBox: { backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 8, elevation: 4 },
   toastText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  // Immersive mode filter bar — compact text chips
+  immersiveFilterBar: { backgroundColor: 'rgba(0,0,0,0.82)', maxHeight: 44 },
+  immersiveFilterBarContent: { alignItems: 'center', paddingHorizontal: 12, gap: 8, paddingVertical: 8 },
+  immersiveChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  immersiveChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  immersiveChipActiveDanger: {
+    backgroundColor: '#dc2626',
+    borderColor: '#dc2626',
+  },
+  immersiveChipActiveCrisis: {
+    backgroundColor: '#9333ea',
+    borderColor: '#9333ea',
+  },
+  immersiveChipText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  immersiveChipTextActive: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
 });

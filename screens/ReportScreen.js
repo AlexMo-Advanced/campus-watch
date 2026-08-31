@@ -30,30 +30,34 @@ export default function ReportScreen({ navigation }) {
     }, [setReportingActive])
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!ready) return;
+  const [wasFocused, setWasFocused] = useState(false);
 
-      if (inDetailsRef.current) return;
-
-      const launchMode = consumeLaunchMode() ?? preference;
-      setMode(launchMode);
-      setInstantStep('camera');
-      setPhotoUri(null);
-    }, [ready, preference, consumeLaunchMode])
-  );
-
-  // Picker can launch a mode while this tab is already focused (long-press on Report).
   useEffect(() => {
-    if (!ready || !pendingLaunchMode || inDetailsRef.current || !isFocused) return;
+    if (!ready) return;
 
-    const launchMode = consumeLaunchMode();
-    if (!launchMode) return;
+    if (isFocused) {
+      const gainedFocus = !wasFocused;
+      if (gainedFocus) {
+        setWasFocused(true);
+      }
 
-    setMode(launchMode);
-    setInstantStep('camera');
-    setPhotoUri(null);
-  }, [ready, pendingLaunchMode, consumeLaunchMode, isFocused]);
+      if (gainedFocus && !inDetailsRef.current) {
+        const launchMode = consumeLaunchMode() ?? preference;
+        setMode(launchMode);
+        setInstantStep('camera');
+        setPhotoUri(null);
+      } else if (pendingLaunchMode && !inDetailsRef.current) {
+        const launchMode = consumeLaunchMode();
+        if (launchMode) {
+          setMode(launchMode);
+          setInstantStep('camera');
+          setPhotoUri(null);
+        }
+      }
+    } else {
+      setWasFocused(false);
+    }
+  }, [ready, isFocused, pendingLaunchMode, preference, wasFocused, consumeLaunchMode]);
 
   const handlePhotoTaken = (uri) => {
     setPhotoUri(uri);

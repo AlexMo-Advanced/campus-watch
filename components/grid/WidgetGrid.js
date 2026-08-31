@@ -12,8 +12,8 @@ export default function WidgetGrid({ layout, isEditing, onLayoutChange, onRemove
   
   // Calculate total height of grid based on widgets
   const maxRow = layout.reduce((max, item) => Math.max(max, item.grid_y + item.height), 0);
-  // Add some buffer at the bottom for dragging, or if empty
-  const gridHeight = Math.max(maxRow + (isEditing ? 2 : 0), 4) * ROW_HEIGHT;
+  // Add some buffer at the bottom for dragging, or if empty (only when editing)
+  const gridHeight = Math.max(maxRow + (isEditing ? 2 : 0), isEditing ? 4 : 0) * ROW_HEIGHT;
 
   const handleDragEnd = (id, newX, newY) => {
     onLayoutChange(id, { grid_x: newX, grid_y: newY });
@@ -22,6 +22,10 @@ export default function WidgetGrid({ layout, isEditing, onLayoutChange, onRemove
   const handleResizeEnd = (id, newW, newH) => {
     onLayoutChange(id, { width: newW, height: newH });
   };
+
+  if (layout.length === 0 && !isEditing) {
+    return null;
+  }
 
   return (
     <View style={[styles.gridContainer, { height: gridHeight }]}>

@@ -34,6 +34,7 @@ import { LockdownProvider, useLockdown } from '../lib/LockdownContext';
 import { NetworkProvider, useNetwork } from '../lib/NetworkContext';
 import { NotificationProvider } from '../lib/NotificationContext';
 import { registerPushToken } from '../lib/pushNotifications';
+import { FeedViewModeProvider } from '../lib/FeedViewModeContext';
 import { ReportModeProvider } from '../lib/ReportModeContext';
 import { flushQueue } from '../lib/reportQueue';
 import { supabase } from '../lib/supabase';
@@ -387,11 +388,13 @@ export default function RootLayout() {
         <SoundsProvider>
         <NetworkProvider>
         <ReportModeProvider>
+        <FeedViewModeProvider>
           <LockdownProvider>
           <ErrorBoundary>
             <AppContent />
           </ErrorBoundary>
           </LockdownProvider>
+        </FeedViewModeProvider>
         </ReportModeProvider>
         </NetworkProvider>
         </SoundsProvider>

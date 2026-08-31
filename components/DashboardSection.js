@@ -59,14 +59,7 @@ export default function DashboardSection({ userId, colors }) {
   return (
     <TouchableWithoutFeedback onPress={() => isEditing && toggleEdit()}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.textMain }]}>Dashboard</Text>
-          <TouchableOpacity onPress={toggleEdit} style={styles.editBtn}>
-            <Text style={[styles.editBtnText, { color: colors.primary }]}>
-              {isEditing ? 'Done' : 'Edit Layout'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+
 
         <WidgetGrid 
           layout={localLayout}
@@ -103,7 +96,7 @@ export default function DashboardSection({ userId, colors }) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: 20
+    paddingBottom: 0
   },
   header: {
     flexDirection: 'row',

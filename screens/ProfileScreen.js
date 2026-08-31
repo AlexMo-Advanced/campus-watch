@@ -23,6 +23,7 @@ import { useLanguage } from '../lib/LanguageContext';
 import { useLockdown } from '../lib/LockdownContext';
 import { useProximity } from '../lib/ProximityContext';
 import { useReportMode } from '../lib/ReportModeContext';
+import { useFeedViewMode } from '../lib/FeedViewModeContext';
 import {
   REPORT_MODE_INSTANT,
   REPORT_MODE_STANDARD,
@@ -64,6 +65,7 @@ export default function ProfileScreen({ navigation }) {
   const { language, languages } = useLanguage();
   const currentLanguageLabel = t(languages.find((l) => l.code === language)?.labelKey || 'language.english');
   const { preference, setPreference } = useReportMode();
+  const { mode: feedViewMode, setMode: setFeedViewMode } = useFeedViewMode();
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [avatarUri, setAvatarUri] = useState(null);
@@ -203,9 +205,24 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) Alert.alert(t('common.error'), error.message);
+  const handleSignOut = () => {
+    Alert.alert(
+      t('settings.signOut') || 'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Yes',
+          onPress: async () => {
+            const { error } = await supabase.auth.signOut();
+            if (error) Alert.alert(t('common.error'), error.message);
+          },
+        },
+      ]
+    );
   };
 
   const checkForUpdates = () => navigation.navigate('Updates');
@@ -497,6 +514,41 @@ export default function ProfileScreen({ navigation }) {
           </View>
           <Text style={[styles.reportPrefHint, { color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 12 }]}>
             {t('settings.reportModeTip')}
+          </Text>
+        </View>
+
+        {/* ── FEED ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Feed</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+          <View style={styles.groupRow}>
+            <View style={[styles.rowInfo, styles.rowInfoFlex]}>
+              <Ionicons name="play-circle-outline" size={20} color={colors.primary} />
+              <View style={styles.rowTextFlex}>
+                <Text style={[styles.rowLabel, { color: colors.text }]}>Feed View</Text>
+                <Text style={[styles.rowSub, { color: colors.textSecondary }]}>
+                  {feedViewMode === 'immersive' ? 'Full-screen immersive scroll' : 'Standard card list'}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <View style={[styles.reportPrefRow, { paddingHorizontal: 16, paddingBottom: 14 }]}>
+            <TouchableOpacity
+              style={[styles.reportPrefChip, feedViewMode === 'list' && styles.reportPrefChipActive]}
+              onPress={() => setFeedViewMode('list')}
+            >
+              <Ionicons name="list-outline" size={16} color={feedViewMode === 'list' ? '#fff' : colors.primary} />
+              <Text style={[styles.reportPrefChipText, feedViewMode === 'list' && styles.reportPrefChipTextActive]}>List</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.reportPrefChip, feedViewMode === 'immersive' && styles.reportPrefChipActive]}
+              onPress={() => setFeedViewMode('immersive')}
+            >
+              <Ionicons name="phone-portrait-outline" size={16} color={feedViewMode === 'immersive' ? '#fff' : colors.textSecondary} />
+              <Text style={[styles.reportPrefChipText, feedViewMode === 'immersive' && styles.reportPrefChipTextActive]}>Immersive</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.reportPrefHint, { color: colors.textMuted, paddingHorizontal: 16, paddingBottom: 12 }]}>
+            Immersive mode shows one full-screen alert per swipe, TikTok-style.
           </Text>
         </View>
 
