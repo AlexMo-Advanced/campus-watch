@@ -41,8 +41,15 @@
         "googleServicesFile": "./google-services.json"
     },
     "web": {
-      "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./public/icon-192.png",
+      "name": "CampusWatch",
+      "shortName": "CampusWatch",
+      "themeColor": "#f97316",
+      "backgroundColor": "#0f172a",
+      "display": "standalone",
+      "startUrl": "/"
     },
     "plugins": [
       "expo-router",
@@ -66,7 +73,7 @@
           "locationAlwaysAndWhenInUsePermission": "CampusWatch needs your location to show where incidents are happening on campus."
         }
       ],
-      "@maplibre/maplibre-react-native",
+
       [
         "expo-notifications",
         {
