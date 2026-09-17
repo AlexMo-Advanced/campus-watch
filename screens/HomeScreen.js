@@ -192,6 +192,7 @@ export default function HomeScreen() {
             avatar_url
           )
         `)
+        .neq('moderation_status', 'hidden')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

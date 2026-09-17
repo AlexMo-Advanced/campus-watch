@@ -72,6 +72,7 @@ export default function ProfileScreen({ navigation }) {
   const [avatarUri, setAvatarUri] = useState(null);
   const [email, setEmail] = useState('');
   const [archivedReports, setArchivedReports] = useState([]);
+  const [hiddenReports, setHiddenReports] = useState([]);
 
   useEffect(() => {
     loadUserProfile();
@@ -94,6 +95,16 @@ export default function ProfileScreen({ navigation }) {
         // Fetch archived reports locally
         const archives = await getArchivedReports();
         setArchivedReports(archives);
+
+        // Fetch hidden reports for this user
+        const { data: hiddenData } = await supabase
+          .from('reports')
+          .select('id, title, description, spam_reasoning, appealed_at')
+          .eq('user_id', user.id)
+          .eq('moderation_status', 'hidden')
+          .order('created_at', { ascending: false });
+        
+        if (hiddenData) setHiddenReports(hiddenData);
       }
     } catch (err) {
       console.log('Error loading profile:', err.message);
@@ -116,6 +127,43 @@ export default function ProfileScreen({ navigation }) {
               loadUserProfile();
             } catch (err) {
               Alert.alert("Error restoring", err.message);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleAppeal = (report) => {
+    Alert.prompt(
+      "Appeal Report",
+      `Reasoning given: ${report.spam_reasoning || 'Violation of terms'}\n\nPlease explain why this report should be restored.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Submit Appeal",
+          onPress: async (message) => {
+            if (!message || message.trim() === '') {
+              Alert.alert('Error', 'Please provide an appeal message.');
+              return;
+            }
+            setLoading(true);
+            try {
+              const { error } = await supabase
+                .from('reports')
+                .update({
+                  moderation_status: 'appealed',
+                  appeal_message: message,
+                  appealed_at: new Date().toISOString()
+                })
+                .eq('id', report.id);
+              if (error) throw error;
+              Alert.alert('Success', 'Appeal submitted and is under review.');
+              loadUserProfile();
+            } catch (err) {
+              Alert.alert('Error', err.message);
             } finally {
               setLoading(false);
             }
@@ -596,6 +644,38 @@ export default function ProfileScreen({ navigation }) {
         </View>
 
         {/* ── APP ── */}
+        {/* HIDDEN REPORTS / APPEALS */}
+        {hiddenReports.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Hidden Reports (Appeals)</Text>
+            <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
+              {hiddenReports.map((report, i) => (
+                <View key={report.id}>
+                  {i > 0 && <View style={styles.groupDivider} />}
+                  <View style={[styles.groupRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 6 }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                      <Text style={[styles.rowLabel, { color: colors.text, flex: 1 }]} numberOfLines={1}>{report.title}</Text>
+                      {report.appealed_at ? (
+                        <View style={{ padding: 4, backgroundColor: '#f1f5f9', borderRadius: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#64748b' }}>Under review</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity onPress={() => handleAppeal(report)} style={{ padding: 4, backgroundColor: '#fee2e2', borderRadius: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#dc2626' }}>Appeal</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {report.spam_reasoning ? (
+                      <Text style={{ fontSize: 11, color: '#991b1b', fontStyle: 'italic' }}>Reason: {report.spam_reasoning}</Text>
+                    ) : null}
+                    <Text style={[styles.rowSub, { color: colors.textBody }]} numberOfLines={2}>{report.description}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settings.app')}</Text>
         <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
           <TouchableOpacity style={styles.groupRow} onPress={checkForUpdates}>

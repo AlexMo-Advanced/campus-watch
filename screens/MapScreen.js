@@ -85,6 +85,7 @@ export default function MapScreen() {
         `)
         .not('latitude', 'is', null)
         .not('longitude', 'is', null)
+        .neq('moderation_status', 'hidden')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

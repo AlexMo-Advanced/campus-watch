@@ -41,6 +41,7 @@ import { flushQueue } from '../lib/reportQueue';
 import { supabase } from '../lib/supabase';
 import { initArchivingService } from '../lib/archivingService';
 import AIChatScreen from '../screens/AIChatScreen';
+import AdminScreen from '../screens/AdminScreen';
 import AuthScreen from '../screens/AuthScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -374,6 +375,11 @@ function AppContent() {
                 headerTintColor: '#ffffff',
                 presentation: 'modal',
               }}
+            />
+            <Stack.Screen
+              name="Admin"
+              component={AdminScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
             />
             <Stack.Screen
               name="Updates"

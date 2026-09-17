@@ -219,6 +219,17 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
 
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user && isOnline) {
+        const { data: canProceed, error: rateLimitError } = await supabase.rpc('check_rate_limit', { p_user_id: user.id });
+        if (!rateLimitError && canProceed === false) {
+          Alert.alert('Rate Limit Exceeded', 'You have submitted too many reports recently. Please try again later.');
+          setLoading(false);
+          return;
+        }
+      }
+
       // Toxicity check — only when online
       if (isOnline) {
         try {
@@ -231,7 +242,6 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
         } catch (_) { }
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
       const payload = {
         title: title.trim(),
         category,

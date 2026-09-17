@@ -53,6 +53,11 @@ export default function InstantReportCameraScreen({ onPhotoTaken, onSwitchToStan
           onPhotoTaken(photo.uri);
         }
       } else {
+        if (typeof cameraRef.current?.takePhoto !== 'function') {
+          // Native bridge not ready — most likely the react-native-vision-camera
+          // plugin is missing from app.json or the dev client needs a rebuild.
+          throw new Error('takePhoto is not available on the camera ref. Rebuild the dev client after adding the react-native-vision-camera plugin to app.json.');
+        }
         const photo = await cameraRef.current.takePhoto({ 
           qualityPrioritization: 'speed',
           enableShutterSound: false,
@@ -62,8 +67,14 @@ export default function InstantReportCameraScreen({ onPhotoTaken, onSwitchToStan
           onPhotoTaken(`file://${photo.path}`);
         }
       }
-    } catch {
-      Alert.alert('Camera Error', 'Could not capture photo. Please try again.');
+    } catch (err) {
+      // Log the real Vision Camera error so we can diagnose it.
+      // CameraCaptureError exposes `.code` (e.g. 'capture/file-io-error') and `.message`.
+      console.error('[CameraCapture] code:', err?.code, '| message:', err?.message, '| raw:', err);
+      Alert.alert(
+        'Camera Error',
+        `Could not capture photo.\n\nCode: ${err?.code ?? 'unknown'}\nMessage: ${err?.message ?? String(err)}`,
+      );
     } finally {
       setCapturing(false);
     }

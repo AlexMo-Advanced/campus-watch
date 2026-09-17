@@ -407,6 +407,7 @@ export default function AIChatScreen({ navigation }) {
       const { data } = await supabase
         .from('reports')
         .select('title, category, severity, location, description, status, created_at, user_id')
+        .neq('moderation_status', 'hidden')
         .order('created_at', { ascending: false })
         .limit(30);
       if (data) setReports(data);

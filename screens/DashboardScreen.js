@@ -259,7 +259,7 @@ export default function DashboardScreen({ navigation }) {
 
 
 
-      const { data, error } = await supabase.from('reports').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('reports').select('*').neq('moderation_status', 'hidden').order('created_at', { ascending: false });
 
       if (error) throw error;
 
