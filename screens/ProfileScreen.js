@@ -31,6 +31,7 @@ import {
 import { useSounds } from '../lib/SoundsContext';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../lib/ThemeContext';
+import { getArchivedReports, restoreArchivedReport } from '../lib/archivingService';
 
 const GPCHS_SCHOOL_INFO = {
   id: 'gpchs',
@@ -90,21 +91,38 @@ export default function ProfileScreen({ navigation }) {
         setDisplayName(user.user_metadata?.display_name || '');
         setAvatarUri(user.user_metadata?.avatar_url || null);
 
-        // Fetch archived reports
-        const { data: reportsData } = await supabase
-          .from('reports')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('status', 'resolved')
-          .order('created_at', { ascending: false });
-        
-        if (reportsData) {
-          setArchivedReports(reportsData);
-        }
+        // Fetch archived reports locally
+        const archives = await getArchivedReports();
+        setArchivedReports(archives);
       }
     } catch (err) {
       console.log('Error loading profile:', err.message);
     }
+  };
+
+  const handleRestore = async (reportId) => {
+    Alert.alert(
+      "Restore Archive",
+      "Upload this report and its images back to the active feed?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Restore", 
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await restoreArchivedReport(reportId);
+              Alert.alert("Success", "Report restored to public feed");
+              loadUserProfile();
+            } catch (err) {
+              Alert.alert("Error restoring", err.message);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   // 1. Pick Image from Phone Library
@@ -552,21 +570,23 @@ export default function ProfileScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* ── MY REPORTS ── */}
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('settings.myReports')}</Text>
+        {/* ── ARCHIVED REPORTS ── */}
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Archived Reports</Text>
         <View style={[styles.settingsGroup, { backgroundColor: colors.surface, borderColor: colors.borderInput }]}>
           {archivedReports.length === 0 ? (
             <View style={[styles.groupRow, { justifyContent: 'center' }]}>
-              <Text style={[styles.rowSub, { color: colors.textMuted, fontStyle: 'italic' }]}>{t('settings.noArchived')}</Text>
+              <Text style={[styles.rowSub, { color: colors.textMuted, fontStyle: 'italic' }]}>{t('settings.noArchived') || 'No locally archived reports'}</Text>
             </View>
           ) : (
             archivedReports.map((report, i) => (
               <View key={report.id}>
                 {i > 0 && <View style={styles.groupDivider} />}
                 <View style={[styles.groupRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 4 }]}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
-                    <Text style={[styles.rowLabel, { color: colors.text, flex: 1 }]}>{report.title}</Text>
-                    <Text style={[styles.rowSub, { color: colors.textSecondary }]}>{new Date(report.created_at).toLocaleDateString()}</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                    <Text style={[styles.rowLabel, { color: colors.text, flex: 1 }]} numberOfLines={1}>{report.title}</Text>
+                    <TouchableOpacity onPress={() => handleRestore(report.id)} style={{ padding: 4, backgroundColor: colors.primaryBg, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Restore</Text>
+                    </TouchableOpacity>
                   </View>
                   <Text style={[styles.rowSub, { color: colors.textBody }]} numberOfLines={2}>{report.description}</Text>
                 </View>

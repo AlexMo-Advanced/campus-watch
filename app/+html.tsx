@@ -16,6 +16,10 @@ export default function Root({ children }: PropsWithChildren) {
           name="viewport"
           content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="CampusWatch" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         {/* Preload the vector icon fonts so Ionicons (and other
             @expo/vector-icons sets) render as glyphs instead of squares
             on first paint. */}

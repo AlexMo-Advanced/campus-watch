@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "CampusWatch uses Bluetooth briefly to detect nearby app users during incidents. Tokens rotate every 15 minutes and are never stored long-term.",
-        "NSBluetoothPeripheralUsageDescription": "CampusWatch uses Bluetooth briefly to help deliver nearby incident alerts. No personal identity is broadcast."
+        "NSBluetoothPeripheralUsageDescription": "CampusWatch uses Bluetooth briefly to help deliver nearby incident alerts. No personal identity is broadcast.",
+        "NSCameraUsageDescription": "CampusWatch needs camera access to submit photo reports."
       }
     },
     "android": {
@@ -35,7 +36,8 @@
         "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.VIBRATE"
+        "android.permission.VIBRATE",
+        "android.permission.CAMERA"
       ],
       "package": "com.alexmozeyu2011.campuswatch",
         "googleServicesFile": "./google-services.json"

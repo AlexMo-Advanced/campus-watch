@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import React, { useState } from 'react';
 import {
@@ -16,18 +17,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Marker } from '../components/CustomMapView';
-import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '../lib/supabase';
-import { summarizeAndTagIncident, checkToxicity } from '../lib/gemini';
-import { useTabBarScrollHandler } from '../lib/TabBarScrollContext';
-import { getTabBarClearance } from '../lib/tabBarLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../lib/ThemeContext';
+import MapView, { Marker } from '../components/CustomMapView';
+import { checkToxicity, summarizeAndTagIncident } from '../lib/gemini';
 import { useNetwork } from '../lib/NetworkContext';
-import { enqueueReport } from '../lib/reportQueue';
-import { insertReportPayload } from '../lib/reportProximity';
 import { useProximityOptional } from '../lib/ProximityContext';
+import { insertReportPayload } from '../lib/reportProximity';
+import { enqueueReport } from '../lib/reportQueue';
+import { supabase } from '../lib/supabase';
+import { getTabBarClearance } from '../lib/tabBarLayout';
+import { useTabBarScrollHandler } from '../lib/TabBarScrollContext';
+import { useTheme } from '../lib/ThemeContext';
 import { useFeedback } from '../lib/useFeedback';
 
 const DEFAULT_REGION = {
@@ -78,10 +78,10 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(true);
-  
+
   const [floor, setFloor] = useState('');
   const FLOORS = ['1st', '2nd', '3rd', 'Greenhouse', 'Outside'];
-  const [imageUri, setImageUri] = useState(null);
+  const [imageUris, setImageUris] = useState([]);
   const [loading, setLoading] = useState(false);
   const [aiTagging, setAiTagging] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
@@ -109,10 +109,11 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
+      allowsEditing: false, // allowsEditing must be false for allowsMultipleSelection on some versions, but expo 50+ allows it. Let's just set allowsMultipleSelection.
+      allowsMultipleSelection: true,
       quality: 0.7,
     });
-    if (!result.canceled) setImageUri(result.assets[0].uri);
+    if (!result.canceled) setImageUris(result.assets.map(a => a.uri));
   };
 
   const handleGpsToggle = async (value) => {
@@ -197,7 +198,7 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
       const { category: suggestedCat, summary } = await summarizeAndTagIncident(description);
       setCategory(suggestedCat);
       setAiSummary(summary);
-    } catch (_) {}
+    } catch (_) { }
     finally { setAiTagging(false); }
   };
 
@@ -206,7 +207,7 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
       Alert.alert('Missing Fields', 'Please fill in the title, location, and description.');
       return;
     }
-    
+
     let finalLocation = location.trim();
     if (floor) {
       if (['1st', '2nd', '3rd'].includes(floor)) {
@@ -227,7 +228,7 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
             setLoading(false);
             return;
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -252,16 +253,21 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
         Alert.alert(
           'Saved Offline',
           'No internet connection. Your report has been saved and will be submitted automatically when you reconnect.',
-          [{ text: 'OK', onPress: () => { setTitle(''); setLocation(''); setDescription(''); setImageUri(null); setLatitude(null); setLongitude(null); setPinCoordinate(null); setUseCurrentLocation(false); } }]
+          [{ text: 'OK', onPress: () => { setTitle(''); setLocation(''); setDescription(''); setImageUris([]); setLatitude(null); setLongitude(null); setPinCoordinate(null); setUseCurrentLocation(false); } }]
         );
         return;
       }
 
-      let publicImageUrl = null;
-      if (imageUri) {
-        publicImageUrl = await uploadImageToSupabase(imageUri, user ? user.id : 'anonymous');
+      let publicImageUrls = [];
+      if (imageUris.length > 0) {
+        publicImageUrls = await Promise.all(
+          imageUris.map(uri => uploadImageToSupabase(uri, user ? user.id : 'anonymous'))
+        );
       }
-      payload.image_url = publicImageUrl;
+      
+      // Deprecated image_url, keep for backwards compatibility
+      payload.image_url = publicImageUrls.length > 0 ? publicImageUrls[0] : null;
+      payload.image_urls = publicImageUrls.length > 0 ? publicImageUrls : null;
 
       reportSubmitted();
       const nearbyTokens = proximity?.enabled ? proximity.getNearbyTokens() : [];
@@ -274,7 +280,7 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
             setLocation('');
             setFloor('');
             setDescription('');
-            setImageUri(null);
+            setImageUris([]);
             setLatitude(null);
             setLongitude(null);
             setPinCoordinate(null);
@@ -424,12 +430,18 @@ export default function StandardReportScreen({ navigation, onSwitchToInstant }) 
           </View>
         )}
 
-        <Text style={styles.label}>Attach Photo (Optional)</Text>
+        <Text style={styles.label}>Attach Photo(s) (Optional)</Text>
         <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
           <Ionicons name="camera-outline" size={20} color={colors.primary} />
-          <Text style={styles.imagePickerText}>{imageUri ? 'Change Image' : 'Select Image'}</Text>
+          <Text style={styles.imagePickerText}>{imageUris.length > 0 ? 'Change Images' : 'Select Images'}</Text>
         </TouchableOpacity>
-        {imageUri && <Image source={{ uri: imageUri }} style={styles.previewImage} />}
+        {imageUris.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+            {imageUris.map((uri, idx) => (
+              <Image key={idx} source={{ uri }} style={[styles.previewImage, { width: 120, height: 120, marginRight: 10, marginTop: 0 }]} />
+            ))}
+          </ScrollView>
+        )}
 
         <View style={styles.toggleRow}>
           <Text style={styles.toggleLabel}>Submit Anonymously</Text>

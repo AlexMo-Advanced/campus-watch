@@ -6,6 +6,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -14,15 +15,14 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Modal,
 } from 'react-native';
-import MapView, { Marker } from '../components/CustomMapView';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { captureCurrentLocation, submitReport } from '../lib/reportSubmit';
+import MapView, { Marker } from '../components/CustomMapView';
 import { useProximityOptional } from '../lib/ProximityContext';
-import { useFeedback } from '../lib/useFeedback';
+import { captureCurrentLocation, submitReport } from '../lib/reportSubmit';
 import { useTheme } from '../lib/ThemeContext';
+import { useFeedback } from '../lib/useFeedback';
 
 const CATEGORIES = ['Safety', 'Maintenance', 'Vandalism', 'Lost & Found', 'Other'];
 const SEVERITIES = [
@@ -52,7 +52,7 @@ export default function InstantReportDetailsScreen({
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [loading, setLoading] = useState(false);
   const [locLoading, setLocLoading] = useState(true);
-  
+
   const [floor, setFloor] = useState('');
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [pinCoordinate, setPinCoordinate] = useState(null);
@@ -89,7 +89,7 @@ export default function InstantReportDetailsScreen({
       Alert.alert('Location needed', 'Please add where this incident occurred.');
       return;
     }
-    
+
     if (floor) {
       if (['1st', '2nd', '3rd'].includes(floor)) {
         finalLocation += ` (${floor} Floor)`;

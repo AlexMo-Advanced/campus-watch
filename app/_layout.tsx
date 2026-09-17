@@ -8,6 +8,7 @@ import React, { Component, ErrorInfo, ReactNode, useCallback, useEffect, useStat
 import {
   ActivityIndicator,
   Image,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -38,6 +39,7 @@ import { FeedViewModeProvider } from '../lib/FeedViewModeContext';
 import { ReportModeProvider } from '../lib/ReportModeContext';
 import { flushQueue } from '../lib/reportQueue';
 import { supabase } from '../lib/supabase';
+import { initArchivingService } from '../lib/archivingService';
 import AIChatScreen from '../screens/AIChatScreen';
 import AuthScreen from '../screens/AuthScreen';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -47,6 +49,14 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ReportScreen from '../screens/ReportScreen';
 import UpdateScreen from '../screens/UpdateScreen';
+
+function registerServiceWorker() {
+  if (Platform.OS === "web" && "serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    });
+  }
+}
 
 // --- Error Boundary Props & State Interfaces ---
 interface ErrorBoundaryProps {
@@ -379,6 +389,11 @@ function AppContent() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    registerServiceWorker();
+    initArchivingService();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>

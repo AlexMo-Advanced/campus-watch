@@ -29,11 +29,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CommentSection from '../components/CommentSection';
-import DashboardSection from '../components/DashboardSection';
-import ImmersiveFeed from '../components/feed/ImmersiveFeed';
 import MapView, { Marker } from '../components/CustomMapView';
+import DashboardSection from '../components/DashboardSection';
 import ReportLikeButton from '../components/ReportLikeButton';
 import ShareReportSheet from '../components/ShareReportSheet';
+import ImmersiveFeed from '../components/feed/ImmersiveFeed';
+import ImageCarousel from '../components/feed/ImageCarousel';
 import { useFeedViewMode } from '../lib/FeedViewModeContext';
 import { useNetwork } from '../lib/NetworkContext';
 import { useNotifications } from '../lib/NotificationContext';
@@ -103,6 +104,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [immersiveCommentReport, setImmersiveCommentReport] = useState(null);
   const [actionMenuReport, setActionMenuReport] = useState(null);
   const [shareReport, setShareReport] = useState(null);
   const [feedMode, setFeedMode] = useState('Active'); // 'Active' | 'Archive'
@@ -330,9 +332,9 @@ export default function HomeScreen() {
       if (canResolve) options.push('Resolve Alert');
       if (canRevive) options.push('Revive Alert');
       if (isOwner) options.push('Delete Alert');
-      
+
       const destructiveIndex = options.indexOf('Delete Alert');
-      
+
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options,
@@ -419,58 +421,60 @@ export default function HomeScreen() {
           onLongPress={() => handleLongPress(item)}
           delayLongPress={400}
         >
-        <LinearGradient colors={getSeverityGradient(item.severity, isDark)} style={styles.cardGradient}>
-        {/* Author Header Bar */}
-        <View style={styles.authorRow}>
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.authorAvatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons
-                name={item.is_anonymous ? 'person-circle-outline' : 'person'}
-                size={22}
-                color={colors.icon}
-              />
+          <LinearGradient colors={getSeverityGradient(item.severity, isDark)} style={styles.cardGradient}>
+            {/* Author Header Bar */}
+            <View style={styles.authorRow}>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.authorAvatar} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons
+                    name={item.is_anonymous ? 'person-circle-outline' : 'person'}
+                    size={22}
+                    color={colors.icon}
+                  />
+                </View>
+              )}
+              <View style={styles.authorInfo}>
+                <Text style={styles.authorName}>{authorName}</Text>
+                <Text style={styles.authorSubtext}>
+                  {new Date(item.created_at).toLocaleDateString()}
+                </Text>
+              </View>
             </View>
-          )}
-          <View style={styles.authorInfo}>
-            <Text style={styles.authorName}>{authorName}</Text>
-            <Text style={styles.authorSubtext}>
-              {new Date(item.created_at).toLocaleDateString()}
-            </Text>
-          </View>
-        </View>
 
-        {item.image_url && (
-          <Image source={{ uri: item.image_url }} style={styles.cardImage} resizeMode="cover" />
-        )}
+            {item.image_urls && item.image_urls.length > 0 ? (
+              <ImageCarousel imageUrls={item.image_urls} width={'100%'} height={180} />
+            ) : item.image_url ? (
+              <Image source={{ uri: item.image_url }} style={styles.cardImage} resizeMode="cover" />
+            ) : null}
 
-        <View style={styles.cardBody}>
-          <View style={styles.badgeRow}>
-            <Text style={styles.categoryBadge}>{item.category || 'General'}</Text>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-              <Text style={styles.statusText}>
-                {(item.status || 'pending').replace('_', ' ').toUpperCase()}
+            <View style={styles.cardBody}>
+              <View style={styles.badgeRow}>
+                <Text style={styles.categoryBadge}>{item.category || 'General'}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                  <Text style={styles.statusText}>
+                    {(item.status || 'pending').replace('_', ' ').toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              <Text style={styles.cardLocation}>
+                <Ionicons name="location-outline" size={14} color={colors.icon} /> {item.location}
               </Text>
+              <Text style={styles.cardDescription} numberOfLines={2}>
+                {item.description}
+              </Text>
+
+              <View style={styles.cardFooterRow}>
+                <Text style={styles.cardFooter}>
+                  {item.is_anonymous ? t('feed.submittedAnonymously') : t('feed.verifiedPost')}
+                </Text>
+                <Text style={styles.tapToExpandText}>{t('feed.holdForOptions')}</Text>
+              </View>
             </View>
-          </View>
-
-          <Text style={styles.cardTitle}>{item.title}</Text>
-          <Text style={styles.cardLocation}>
-            <Ionicons name="location-outline" size={14} color={colors.icon} /> {item.location}
-          </Text>
-          <Text style={styles.cardDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
-
-          <View style={styles.cardFooterRow}>
-            <Text style={styles.cardFooter}>
-              {item.is_anonymous ? t('feed.submittedAnonymously') : t('feed.verifiedPost')}
-            </Text>
-            <Text style={styles.tapToExpandText}>{t('feed.holdForOptions')}</Text>
-          </View>
-        </View>
-        </LinearGradient>
+          </LinearGradient>
         </TouchableOpacity>
       </Animated.View>
     );
@@ -549,80 +553,85 @@ export default function HomeScreen() {
       ) : (
         <Animated.View style={[styles.filterSection, filterAnimatedStyle]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storyScroll}>
-          {/* Nearby Story */}
-          <TouchableOpacity 
-            style={styles.storyContainer} 
-            onPress={handleNearbyToggle}>
-            <View style={[styles.storyCircle, nearbyFilter && { borderColor: colors.primary }]}>
-              {getLatestImage('Nearby') ? (
-                <Image source={{ uri: getLatestImage('Nearby') }} style={styles.storyImage} />
-              ) : (
-                <Ionicons name="location" size={24} color={nearbyFilter ? colors.primary : colors.icon} />
-              )}
-            </View>
-            <Text style={[styles.storyText, nearbyFilter && { color: colors.primary, fontWeight: '700' }]}>{t('feed.nearby') || 'Nearby'}</Text>
-          </TouchableOpacity>
-          {/* Posted By Me Story */}
-          <TouchableOpacity 
-            style={styles.storyContainer} 
-            onPress={() => setPostedByMe(!postedByMe)}>
-            <View style={[styles.storyCircle, postedByMe && { borderColor: colors.primary }]}>
-              {getLatestImage('Posted By Me') ? (
-                <Image source={{ uri: getLatestImage('Posted By Me') }} style={styles.storyImage} />
-              ) : (
-                <Ionicons name="person" size={24} color={postedByMe ? colors.primary : colors.icon} />
-              )}
-            </View>
-            <Text style={[styles.storyText, postedByMe && { color: colors.primary, fontWeight: '700' }]}>{t('feed.postedByMe')}</Text>
-          </TouchableOpacity>
-          
-          {/* Last 24H Story */}
-          <TouchableOpacity 
-            style={styles.storyContainer} 
-            onPress={() => setTimeFilter(timeFilter === '24h' ? 'All Time' : '24h')}>
-            <View style={[styles.storyCircle, timeFilter === '24h' && { borderColor: colors.primary }]}>
-              {getLatestImage('Last 24H') ? (
-                <Image source={{ uri: getLatestImage('Last 24H') }} style={styles.storyImage} />
-              ) : (
-                <Ionicons name="time" size={24} color={timeFilter === '24h' ? colors.primary : colors.icon} />
-              )}
-            </View>
-            <Text style={[styles.storyText, timeFilter === '24h' && { color: colors.primary, fontWeight: '700' }]}>{t('feed.last24h')}</Text>
-          </TouchableOpacity>
-          
-          {/* High Severity Story */}
-          <TouchableOpacity 
-            style={styles.storyContainer} 
-            onPress={() => setSeverityFilter(severityFilter === 'High' ? 'All' : 'High')}>
-            <View style={[styles.storyCircle, severityFilter === 'High' && { borderColor: colors.danger }]}>
-              {getLatestImage('High') ? (
-                <Image source={{ uri: getLatestImage('High') }} style={styles.storyImage} />
-              ) : (
-                <Ionicons name="warning" size={24} color={severityFilter === 'High' ? colors.danger : colors.icon} />
-              )}
-            </View>
-            <Text style={[styles.storyText, severityFilter === 'High' && { color: colors.danger, fontWeight: '700' }]}>High</Text>
-          </TouchableOpacity>
+            {/* Nearby Story */}
+            <TouchableOpacity
+              style={styles.storyContainer}
+              onPress={handleNearbyToggle}>
+              <View style={[styles.storyCircle, nearbyFilter && { borderColor: colors.primary }]}>
+                {getLatestImage('Nearby') ? (
+                  <Image source={{ uri: getLatestImage('Nearby') }} style={styles.storyImage} />
+                ) : (
+                  <Ionicons name="location" size={24} color={nearbyFilter ? colors.primary : colors.icon} />
+                )}
+              </View>
+              <Text style={[styles.storyText, nearbyFilter && { color: colors.primary, fontWeight: '700' }]}>{t('feed.nearby') || 'Nearby'}</Text>
+            </TouchableOpacity>
+            {/* Posted By Me Story */}
+            <TouchableOpacity
+              style={styles.storyContainer}
+              onPress={() => setPostedByMe(!postedByMe)}>
+              <View style={[styles.storyCircle, postedByMe && { borderColor: colors.primary }]}>
+                {getLatestImage('Posted By Me') ? (
+                  <Image source={{ uri: getLatestImage('Posted By Me') }} style={styles.storyImage} />
+                ) : (
+                  <Ionicons name="person" size={24} color={postedByMe ? colors.primary : colors.icon} />
+                )}
+              </View>
+              <Text style={[styles.storyText, postedByMe && { color: colors.primary, fontWeight: '700' }]}>{t('feed.postedByMe')}</Text>
+            </TouchableOpacity>
 
-          {/* Crisis Severity Story */}
-          <TouchableOpacity 
-            style={styles.storyContainer} 
-            onPress={() => setSeverityFilter(severityFilter === 'Crisis' ? 'All' : 'Crisis')}>
-            <View style={[styles.storyCircle, severityFilter === 'Crisis' && { borderColor: colors.crisis }]}>
-              {getLatestImage('Crisis') ? (
-                <Image source={{ uri: getLatestImage('Crisis') }} style={styles.storyImage} />
-              ) : (
-                <Ionicons name="alert-circle" size={24} color={severityFilter === 'Crisis' ? colors.crisis : colors.icon} />
-              )}
-            </View>
-            <Text style={[styles.storyText, severityFilter === 'Crisis' && { color: colors.crisis, fontWeight: '700' }]}>Crisis</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </Animated.View>
+            {/* Last 24H Story */}
+            <TouchableOpacity
+              style={styles.storyContainer}
+              onPress={() => setTimeFilter(timeFilter === '24h' ? 'All Time' : '24h')}>
+              <View style={[styles.storyCircle, timeFilter === '24h' && { borderColor: colors.primary }]}>
+                {getLatestImage('Last 24H') ? (
+                  <Image source={{ uri: getLatestImage('Last 24H') }} style={styles.storyImage} />
+                ) : (
+                  <Ionicons name="time" size={24} color={timeFilter === '24h' ? colors.primary : colors.icon} />
+                )}
+              </View>
+              <Text style={[styles.storyText, timeFilter === '24h' && { color: colors.primary, fontWeight: '700' }]}>{t('feed.last24h')}</Text>
+            </TouchableOpacity>
+
+            {/* High Severity Story */}
+            <TouchableOpacity
+              style={styles.storyContainer}
+              onPress={() => setSeverityFilter(severityFilter === 'High' ? 'All' : 'High')}>
+              <View style={[styles.storyCircle, severityFilter === 'High' && { borderColor: colors.danger }]}>
+                {getLatestImage('High') ? (
+                  <Image source={{ uri: getLatestImage('High') }} style={styles.storyImage} />
+                ) : (
+                  <Ionicons name="warning" size={24} color={severityFilter === 'High' ? colors.danger : colors.icon} />
+                )}
+              </View>
+              <Text style={[styles.storyText, severityFilter === 'High' && { color: colors.danger, fontWeight: '700' }]}>High</Text>
+            </TouchableOpacity>
+
+            {/* Crisis Severity Story */}
+            <TouchableOpacity
+              style={styles.storyContainer}
+              onPress={() => setSeverityFilter(severityFilter === 'Crisis' ? 'All' : 'Crisis')}>
+              <View style={[styles.storyCircle, severityFilter === 'Crisis' && { borderColor: colors.crisis }]}>
+                {getLatestImage('Crisis') ? (
+                  <Image source={{ uri: getLatestImage('Crisis') }} style={styles.storyImage} />
+                ) : (
+                  <Ionicons name="alert-circle" size={24} color={severityFilter === 'Crisis' ? colors.crisis : colors.icon} />
+                )}
+              </View>
+              <Text style={[styles.storyText, severityFilter === 'Crisis' && { color: colors.crisis, fontWeight: '700' }]}>Crisis</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
       )}
 
       {feedViewMode === 'immersive' ? (
-        <ImmersiveFeed reports={getFilteredReports()} />
+        <ImmersiveFeed
+          reports={getFilteredReports()}
+          onComment={(report) => setImmersiveCommentReport(report)}
+          onExpand={(report) => setSelectedReport(report)}
+          onShare={(report) => setShareReport(report)}
+        />
       ) : (
         <FlatList
           data={getFilteredReports()}
@@ -757,13 +766,15 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-              {selectedReport.image_url && (
+              {selectedReport.image_urls && selectedReport.image_urls.length > 0 ? (
+                <ImageCarousel imageUrls={selectedReport.image_urls} width={'100%'} height={280} />
+              ) : selectedReport.image_url ? (
                 <Image
                   source={{ uri: selectedReport.image_url }}
                   style={styles.modalImage}
                   resizeMode="cover"
                 />
-              )}
+              ) : null}
 
               <View style={styles.modalBadgeRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -772,10 +783,10 @@ export default function HomeScreen() {
                     <Text style={[
                       styles.categoryBadge,
                       selectedReport.severity === 'Crisis' ? { backgroundColor: '#fce7f3', color: '#9d174d' } :
-                      selectedReport.severity === 'High' ? { backgroundColor: '#fee2e2', color: '#dc2626' } :
-                      selectedReport.severity === 'Medium' ? { backgroundColor: '#fef3c7', color: '#d97706' } :
-                      selectedReport.severity === 'Low' ? { backgroundColor: '#dcfce7', color: '#16a34a' } :
-                      {}
+                        selectedReport.severity === 'High' ? { backgroundColor: '#fee2e2', color: '#dc2626' } :
+                          selectedReport.severity === 'Medium' ? { backgroundColor: '#fef3c7', color: '#d97706' } :
+                            selectedReport.severity === 'Low' ? { backgroundColor: '#dcfce7', color: '#16a34a' } :
+                              {}
                     ]}>
                       {selectedReport.severity}
                     </Text>
@@ -812,7 +823,7 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     style={styles.resolveBtnDetail}
                     onPress={() => {
-                       handleResolve(selectedReport);
+                      handleResolve(selectedReport);
                     }}
                   >
                     <Ionicons name="checkmark-circle" size={16} color="#fff" />
@@ -823,7 +834,7 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     style={[styles.resolveBtnDetail, { backgroundColor: colors.danger, marginTop: 8 }]}
                     onPress={() => {
-                       handleDelete(selectedReport);
+                      handleDelete(selectedReport);
                     }}
                   >
                     <Ionicons name="trash" size={16} color="#fff" />
@@ -858,8 +869,8 @@ export default function HomeScreen() {
                         coordinate={{ latitude: selectedReport.latitude, longitude: selectedReport.longitude }}
                         pinColor={
                           selectedReport.status === 'resolved' ? colors.success
-                          : selectedReport.status === 'under_review' ? colors.warning
-                          : colors.danger
+                            : selectedReport.status === 'under_review' ? colors.warning
+                              : colors.danger
                         }
                       />
                     </MapView>
@@ -881,12 +892,46 @@ export default function HomeScreen() {
         )}
       </Modal>
 
+      {/* Share Bottom Sheet Modal */}
       <ShareReportSheet
         visible={!!shareReport}
         report={shareReport}
-        isDark={isDark}
         onClose={() => setShareReport(null)}
+        colors={colors}
       />
+
+      {/* Immersive Comments Modal */}
+      <Modal
+        visible={!!immersiveCommentReport}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setImmersiveCommentReport(null)}
+      >
+        <KeyboardAvoidingView style={styles.immersiveCommentModalContainer} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <TouchableOpacity style={styles.immersiveCommentOverlay} activeOpacity={1} onPress={() => setImmersiveCommentReport(null)} />
+          <View style={[styles.immersiveCommentContent, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <View style={styles.immersiveCommentHeader}>
+              <Text style={[styles.immersiveCommentTitle, { color: colors.textMain }]}>Comments</Text>
+              <TouchableOpacity onPress={() => setImmersiveCommentReport(null)}>
+                <Ionicons name="close" size={24} color={colors.textMain} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1 }}>
+              {immersiveCommentReport && (
+                <CommentSection
+                  reportId={immersiveCommentReport.id}
+                  report={immersiveCommentReport}
+                  colors={colors}
+                  isDark={isDark}
+                  channelPrefix="immersive_comments"
+                />
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Toast */}
       {toastMessage && (
         <Animated.View entering={FadeInDown.duration(300)} style={styles.toastContainer}>
           <View style={styles.toastBox}>
@@ -914,8 +959,8 @@ const getStyles = (colors) => StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   listContent: { padding: 16 },
   card: { borderRadius: 12, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.cardBorder, elevation: 2, backgroundColor: colors.cardBg },
-  cardGradient: { },
-  
+  cardGradient: {},
+
   authorRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
   authorAvatar: { width: 38, height: 38, borderRadius: 19, marginRight: 10, backgroundColor: colors.pillBg },
   avatarPlaceholder: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.placeholder, justifyContent: 'center', alignItems: 'center', marginRight: 10, borderWidth: 1, borderColor: colors.border },
@@ -1015,6 +1060,35 @@ const getStyles = (colors) => StyleSheet.create({
   },
   immersiveChipTextActive: {
     color: '#ffffff',
+    fontWeight: '700',
+  },
+
+  // Immersive Comments Modal Styles
+  immersiveCommentModalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  immersiveCommentOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  immersiveCommentContent: {
+    height: '70%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    overflow: 'hidden',
+  },
+  immersiveCommentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(150,150,150,0.2)',
+  },
+  immersiveCommentTitle: {
+    fontSize: 18,
     fontWeight: '700',
   },
 });

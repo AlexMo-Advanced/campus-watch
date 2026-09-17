@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Linking,
@@ -9,19 +10,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTheme } from '../../lib/ThemeContext';
 import Animated, {
   Easing,
-  FadeIn,
-  FadeInUp,
+  FadeInDown,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withSequence,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import MapView, { Marker } from '../CustomMapView';
-import { useTranslation } from 'react-i18next';
 
 export function SecurityIndexWidget({ statusInfo, activeCount, colors }) {
   const { t } = useTranslation();
@@ -44,93 +45,198 @@ export function SecurityIndexWidget({ statusInfo, activeCount, colors }) {
   );
 }
 
-function AiBriefShell({ loading, children }) {
+function AiBriefShell({ loading, children, colors }) {
+  const theme = useTheme();
+  const activeColors = colors || theme.colors;
+  const isDark = theme.isDark;
+
+  const gradientColors = activeColors?.backgroundGradient || (isDark
+    ? ['#0f172a', '#1e293b', '#0f172a']
+    : ['#e0f2fe', '#f8fafc', '#e0f2fe']);
+
+  const accentGradient = activeColors?.accentGradient || ['#38bdf8', '#2563eb'];
+
+  // Ambient animated shimmer orb moving horizontally
+  const orbTranslateX = useSharedValue(-80);
+  const orbOpacity = useSharedValue(0.25);
+
+  useEffect(() => {
+    orbTranslateX.value = withRepeat(
+      withTiming(240, { duration: 4500, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+    orbOpacity.value = withRepeat(
+      withTiming(0.55, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+  }, [orbTranslateX, orbOpacity]);
+
+  const orbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: orbTranslateX.value }],
+    opacity: orbOpacity.value,
+  }));
+
+  const borderColor = isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(37, 99, 235, 0.22)';
+  const glassOverlay = isDark ? 'rgba(15, 23, 42, 0.4)' : 'rgba(255, 255, 255, 0.5)';
+
   return (
-    <View style={styles.aiBriefShell}>
+    <View style={[styles.aiBriefShell, { borderColor, borderWidth: 1 }]}>
       <LinearGradient
-        colors={loading ? ['#1e3a5f', '#2563eb', '#1e3a5f'] : ['#1e3a5f', '#2563eb', '#1d4ed8']}
+        colors={gradientColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
-      <View style={styles.aiBriefContent}>{children}</View>
+      {/* Animated time-of-day accent shimmer orb */}
+      <Animated.View style={[StyleSheet.absoluteFillObject, orbStyle]}>
+        <LinearGradient
+          colors={[accentGradient[0] + '40', 'transparent', accentGradient[1] + '40']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+      </Animated.View>
+      <View style={[styles.aiBriefContent, { backgroundColor: glassOverlay }]}>
+        {children}
+      </View>
     </View>
   );
 }
 
 export function AiBriefingWidget({ aiLoading, aiReport, colors, onOpenBriefing }) {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const activeColors = colors || theme.colors;
+  const isDark = theme.isDark;
+  const timePeriodLabel = theme.colors.timePeriodLabel || 'Campus';
+
+  // Sparkle pulse animation
+  const sparkleScale = useSharedValue(1);
+  const pressScale = useSharedValue(1);
+
+  useEffect(() => {
+    sparkleScale.value = withRepeat(
+      withSequence(
+        withTiming(1.2, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, [sparkleScale]);
+
+  const animatedSparkleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sparkleScale.value }],
+  }));
+
+  const animatedPressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pressScale.value }],
+  }));
 
   if (aiLoading) {
     return (
-      <AiBriefShell loading>
-        <AiLoadingContent colors={colors} />
+      <AiBriefShell loading colors={activeColors}>
+        <AiLoadingContent colors={activeColors} />
       </AiBriefShell>
     );
   }
   if (!aiReport) return null;
 
+  const titleColor = isDark ? '#f0f9ff' : '#0f172a';
+  const textColor = isDark ? '#dbeafe' : '#1e293b';
+  const subColor = isDark ? '#93c5fd' : '#2563eb';
+  const badgeBg = isDark ? 'rgba(37, 99, 235, 0.85)' : activeColors.primary;
+  const tagBg = isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(37, 99, 235, 0.12)';
+
   const content = (
-    <>
+    <Animated.View entering={FadeInDown.duration(400).springify()}>
       <View style={styles.widgetHeader}>
-        <View style={styles.aiIconBadge}>
+        <Animated.View style={[styles.aiIconBadge, { backgroundColor: badgeBg }, animatedSparkleStyle]}>
           <Ionicons name="sparkles" size={14} color="#ffffff" />
+        </Animated.View>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[styles.widgetTitle, { color: titleColor }]}>{t('dashboard.aiBriefing')}</Text>
+          <View style={[styles.timePeriodBadge, { backgroundColor: tagBg }]}>
+            <Text style={[styles.timePeriodText, { color: subColor }]}>{timePeriodLabel}</Text>
+          </View>
         </View>
-        <Text style={[styles.widgetTitle, { color: '#e0f2fe' }]}>{t('dashboard.aiBriefing')}</Text>
         {onOpenBriefing ? (
-          <Ionicons name="expand-outline" size={16} color="#93c5fd" style={{ marginLeft: 'auto' }} />
+          <Ionicons name="expand-outline" size={16} color={subColor} style={{ marginLeft: 'auto' }} />
         ) : null}
       </View>
-      <Text style={[styles.aiReportText, { color: '#bfdbfe' }]} numberOfLines={6}>
+      <Text style={[styles.aiReportText, { color: textColor }]} numberOfLines={6}>
         {aiReport}
       </Text>
-      <Text style={[styles.aiFooter, { color: '#93c5fd' }]}>
+      <Text style={[styles.aiFooter, { color: subColor }]}>
         {onOpenBriefing ? t('dashboard.tapFullBriefing') : ''}
         {t('dashboard.aiGeneratedBy')}
         {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </Text>
-    </>
+    </Animated.View>
   );
 
   if (!onOpenBriefing) {
-    return <AiBriefShell>{content}</AiBriefShell>;
+    return <AiBriefShell colors={activeColors}>{content}</AiBriefShell>;
   }
 
   return (
-    <AiBriefShell>
-      <TouchableOpacity
-        activeOpacity={0.88}
-        onPress={onOpenBriefing}
-        accessibilityRole="button"
-        accessibilityLabel={t('dashboard.aiBriefing')}
-      >
-        {content}
-      </TouchableOpacity>
+    <AiBriefShell colors={activeColors}>
+      <Animated.View style={animatedPressStyle}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={onOpenBriefing}
+          onPressIn={() => { pressScale.value = withSpring(0.97); }}
+          onPressOut={() => { pressScale.value = withSpring(1); }}
+          accessibilityRole="button"
+          accessibilityLabel={t('dashboard.aiBriefing')}
+        >
+          {content}
+        </TouchableOpacity>
+      </Animated.View>
     </AiBriefShell>
   );
 }
 
 function AiLoadingContent({ colors }) {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isDark = theme.isDark;
   const shimmer = useSharedValue(0);
+  const scanLine = useSharedValue(0);
+
   useEffect(() => {
     shimmer.value = withRepeat(withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }), -1, true);
-  }, [shimmer]);
+    scanLine.value = withRepeat(withTiming(1, { duration: 2000, easing: Easing.linear }), -1, false);
+  }, [shimmer, scanLine]);
+
   const shimmerStyle = useAnimatedStyle(() => ({
     opacity: interpolate(shimmer.value, [0, 1], [0.3, 0.8]),
   }));
+
+  const scanLineStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(scanLine.value, [0, 1], [0, 80]) }],
+    opacity: interpolate(scanLine.value, [0, 0.2, 0.8, 1], [0, 0.8, 0.8, 0]),
+  }));
+
+  const titleColor = isDark ? '#f0f9ff' : '#0f172a';
+  const subColor = isDark ? '#93c5fd' : '#2563eb';
+  const barBg = isDark ? 'rgba(147,197,253,0.25)' : 'rgba(37,99,235,0.2)';
+
   return (
     <>
+      <Animated.View style={[styles.scanBeam, scanLineStyle]} />
       <View style={styles.widgetHeader}>
-        <Ionicons name="sparkles" size={18} color="#93c5fd" />
-        <Text style={[styles.widgetTitle, { color: '#e0f2fe' }]}>{t('dashboard.aiBriefing')}</Text>
-        <ActivityIndicator size="small" color="#93c5fd" style={{ marginLeft: 'auto' }} />
+        <Ionicons name="sparkles" size={18} color={subColor} />
+        <Text style={[styles.widgetTitle, { color: titleColor }]}>{t('dashboard.aiBriefing')}</Text>
+        <ActivityIndicator size="small" color={subColor} style={{ marginLeft: 'auto' }} />
       </View>
-      <Text style={{ color: '#93c5fd', fontSize: 12, fontStyle: 'italic' }}>{t('dashboard.analyzing')}</Text>
+      <Text style={{ color: subColor, fontSize: 12, fontStyle: 'italic' }}>{t('dashboard.analyzing')}</Text>
       {[1, 0.85, 0.65].map((w, i) => (
         <Animated.View
           key={i}
-          style={[styles.shimmerLine, shimmerStyle, { width: `${w * 100}%`, backgroundColor: 'rgba(147,197,253,0.25)' }]}
+          style={[styles.shimmerLine, shimmerStyle, { width: `${w * 100}%`, backgroundColor: barBg }]}
         />
       ))}
     </>
@@ -208,17 +314,17 @@ export function CampusMapWidget({ mapReports, colors, onOpenMap }) {
   const { t } = useTranslation();
   const region = mapReports[0]
     ? {
-        latitude: mapReports[0].latitude,
-        longitude: mapReports[0].longitude,
-        latitudeDelta: 0.04,
-        longitudeDelta: 0.04,
-      }
+      latitude: mapReports[0].latitude,
+      longitude: mapReports[0].longitude,
+      latitudeDelta: 0.04,
+      longitudeDelta: 0.04,
+    }
     : {
-        latitude: 55.1707,
-        longitude: -118.7947,
-        latitudeDelta: 0.08,
-        longitudeDelta: 0.08,
-      };
+      latitude: 55.1707,
+      longitude: -118.7947,
+      latitudeDelta: 0.08,
+      longitudeDelta: 0.08,
+    };
 
   return (
     <>
@@ -338,6 +444,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563eb',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  timePeriodBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  timePeriodText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  scanBeam: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: 'rgba(59,130,246,0.6)',
+    shadowColor: '#3b82f6',
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 10,
   },
   aiReportText: { fontSize: 14, lineHeight: 20, marginTop: 2 },
   aiFooter: { fontSize: 11, marginTop: 8, fontStyle: 'italic' },

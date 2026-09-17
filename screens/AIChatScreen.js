@@ -5,13 +5,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Keyboard,
+  Linking,
   Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  KeyboardAvoidingView,
 } from 'react-native';
+import { useReportMode } from '../lib/ReportModeContext';
+import { REPORT_MODE_INSTANT } from '../lib/reportPreferences';
 import Animated, {
   Easing,
   FadeIn,
@@ -25,6 +29,7 @@ import Animated, {
   withDelay,
   withRepeat,
   withSequence,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,11 +41,42 @@ import { useNetwork } from '../lib/NetworkContext';
 import * as Location from 'expo-location';
 import { useProximityOptional } from '../lib/ProximityContext';
 
+// Animation constants for "quicker, more rapid but bouncy" effect
+const SPRING_CONFIG = { damping: 14, stiffness: 220 };
+
 const SUGGESTED_PROMPTS = [
-  'How do I report a safety incident?',
-  'What should I do in a lockdown?',
-  'Are there any active alerts near me?',
-  'How do I submit an anonymous report?',
+  {
+    id: 'walk',
+    icon: 'walk',
+    title: 'Walking home alone?',
+    description: 'Request a virtual escort or find well-lit paths.',
+    prompt: 'How can I get a virtual escort or find safe paths home?',
+    theme: 'secondary', // #ffbf00
+  },
+  {
+    id: 'study',
+    icon: 'library',
+    title: 'Find safe study spots',
+    description: 'Locate 24/7 areas with security presence.',
+    prompt: 'Where are safe, 24/7 study spots on campus?',
+    theme: 'primary', // #2563eb
+  },
+  {
+    id: 'emergency',
+    icon: 'alert-circle',
+    title: 'Emergency Protocols',
+    description: 'Quick access to campus lockdown procedures.',
+    prompt: 'What are the campus lockdown and emergency procedures?',
+    theme: 'tertiary', // #9f0012
+  },
+  {
+    id: 'report',
+    icon: 'document-text',
+    title: 'Report Incident',
+    description: 'How to submit an anonymous report.',
+    prompt: 'How do I submit an anonymous safety report?',
+    theme: 'primary',
+  }
 ];
 
 function TypingDots({ color = '#2563eb' }) {
@@ -222,7 +258,7 @@ function ChatLoadingScreen({ isDark, colors }) {
 
   return (
     <View style={styles.loadingContent}>
-      <Animated.View entering={FadeInUp.springify()} style={styles.loadingHero}>
+      <Animated.View entering={FadeInUp.springify().damping(15).stiffness(120)} style={styles.loadingHero}>
         <View style={styles.loadingHeroRingWrap}>
           <Animated.View style={[styles.loadingHeroRing, ringStyle]}>
             <LinearGradient
@@ -233,7 +269,7 @@ function ChatLoadingScreen({ isDark, colors }) {
             />
           </Animated.View>
           <Animated.View style={[styles.loadingHeroIcon, pulseStyle, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}>
-            <Ionicons name="sparkles" size={28} color="#2563eb" />
+            <Ionicons name="hardware-chip" size={28} color="#2563eb" />
           </Animated.View>
         </View>
         <Text style={[styles.loadingTitle, { color: colors.text }]}>CampusWatch AI</Text>
@@ -243,7 +279,7 @@ function ChatLoadingScreen({ isDark, colors }) {
       {[0, 1, 2].map((i) => (
         <Animated.View
           key={i}
-          entering={FadeInLeft.delay(200 + i * 120).springify()}
+          entering={FadeInLeft.delay(200 + i * 120).springify().damping(15).stiffness(120)}
           style={[styles.loadingBubble, { backgroundColor: bubbleBg, borderColor: isDark ? '#334155' : '#e2e8f0' }]}
         >
           <Animated.View style={[styles.loadingLine, shimmerStyle, { width: `${90 - i * 15}%`, backgroundColor: lineBg }]} />
@@ -270,34 +306,9 @@ function AnimatedInputBar({
   insets,
   tap,
 }) {
-  const keyboardOffset = useSharedValue(0);
   const focusGlow = useSharedValue(0);
   const sendPulse = useSharedValue(1);
   const hasText = inputText.trim().length > 0;
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const onShow = Keyboard.addListener(showEvent, (e) => {
-      const offset = Math.max(0, e.endCoordinates.height - insets.bottom);
-      keyboardOffset.value = withTiming(offset, {
-        duration: e.duration ?? 250,
-        easing: Easing.out(Easing.cubic),
-      });
-    });
-    const onHide = Keyboard.addListener(hideEvent, (e) => {
-      keyboardOffset.value = withTiming(0, {
-        duration: e?.duration ?? 250,
-        easing: Easing.out(Easing.cubic),
-      });
-    });
-
-    return () => {
-      onShow.remove();
-      onHide.remove();
-    };
-  }, [insets.bottom, keyboardOffset]);
 
   useEffect(() => {
     focusGlow.value = withTiming(hasText ? 1 : 0, { duration: 220 });
@@ -316,13 +327,7 @@ function AnimatedInputBar({
   }, [hasText, focusGlow, sendPulse]);
 
   const barStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -keyboardOffset.value }],
-    paddingBottom: keyboardOffset.value > 0 ? 10 : insets.bottom + 8,
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(focusGlow.value, [0, 1], [0, isDark ? 0.55 : 0.4]),
-    transform: [{ scale: interpolate(focusGlow.value, [0, 1], [0.98, 1]) }],
+    paddingBottom: Math.max(insets.bottom + 8, 12),
   }));
 
   const sendStyle = useAnimatedStyle(() => ({
@@ -333,36 +338,23 @@ function AnimatedInputBar({
 
   return (
     <Animated.View
-      entering={FadeInUp.delay(300).springify()}
+      entering={FadeInUp.delay(300).springify().damping(14).stiffness(220)}
       style={[
         styles.inputBarOuter,
         barStyle,
-        { borderColor: isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 0.6)' },
       ]}
     >
-      <BlurView intensity={isDark ? 40 : 80} tint={isDark ? 'dark' : 'light'} style={[StyleSheet.absoluteFillObject, { borderRadius: 24 }]} />
-      ]}
-    >
-      <Animated.View style={[styles.inputGlowRing, glowStyle]} pointerEvents="none">
-        <LinearGradient
-          colors={['rgba(37, 99, 235, 0.5)', 'rgba(124, 58, 237, 0.25)', 'rgba(37, 99, 235, 0.5)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-      </Animated.View>
-
-      <View style={styles.inputBar}>
+      <View style={[styles.inputContainer, { backgroundColor: isDark ? '#1e293b' : '#ffffff', borderColor: hasText ? '#2563eb' : (isDark ? '#334155' : '#e2e8f0') }]}>
+        <TouchableOpacity style={styles.inputAddBtn}>
+          <Ionicons name="add-circle" size={24} color={isDark ? '#94a3b8' : '#64748b'} />
+        </TouchableOpacity>
+        
         <TextInput
           style={[
             styles.input,
-            {
-              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.85)' : 'rgba(241, 245, 249, 0.95)',
-              color: isDark ? '#f1f5f9' : '#0f172a',
-              borderColor: hasText ? '#2563eb' : (isDark ? '#334155' : '#e2e8f0'),
-            },
+            { color: isDark ? '#f1f5f9' : '#0f172a' },
           ]}
-          placeholder="Ask about campus safety..."
+          placeholder="Type a message or ask for help..."
           placeholderTextColor={isDark ? '#475569' : '#94a3b8'}
           value={inputText}
           onChangeText={setInputText}
@@ -374,6 +366,7 @@ function AnimatedInputBar({
           onFocus={() => { focusGlow.value = withTiming(1, { duration: 200 }); }}
           onBlur={() => { focusGlow.value = withTiming(hasText ? 1 : 0, { duration: 200 }); }}
         />
+        
         <Animated.View style={sendStyle}>
           <TouchableOpacity
             style={[styles.sendBtn, { backgroundColor: hasText ? '#2563eb' : (isDark ? '#334155' : '#e2e8f0') }]}
@@ -381,7 +374,7 @@ function AnimatedInputBar({
             onPressIn={() => hasText && tap()}
             disabled={!hasText || isTyping}
           >
-            <Ionicons name="send" size={18} color={hasText ? '#ffffff' : (isDark ? '#475569' : '#94a3b8')} />
+            <Ionicons name="send" size={18} color={hasText ? '#ffffff' : (isDark ? '#475569' : '#94a3b8')} style={{ marginLeft: 2 }} />
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -394,6 +387,8 @@ export default function AIChatScreen({ navigation }) {
   const { isDark, colors } = useTheme();
   const { aiSend, aiReply, tap, error: hapticError } = useFeedback();
   const { isOnline } = useNetwork();
+  const reportMode = useReportMode();
+  const launchReport = reportMode?.launchReport;
   const flatListRef = useRef(null);
   const [reports, setReports] = useState([]);
   const [pageLoading, setPageLoading] = useState(true);
@@ -431,7 +426,7 @@ export default function AIChatScreen({ navigation }) {
     {
       id: 'welcome',
       role: 'model',
-      parts: "Hi! I'm **CampusWatch AI** — your campus safety assistant. I have access to live campus reports. Ask me anything about current incidents, safety procedures, or how to report an issue.",
+      parts: "Hello! I'm Campus Bot, your AI safety assistant. I can help you find safe routes, locate campus resources, or connect you with emergency services. How can I assist you today?\n\n[ACTION:OPEN_MAP|Open Campus Map|map] [ACTION:INSTANT_REPORT|Snap Photo Report|camera] [ACTION:EMERGENCY_CALL|Emergency Call|call]",
     },
   ]);
   const [inputText, setInputText] = useState('');
@@ -439,24 +434,6 @@ export default function AIChatScreen({ navigation }) {
   const [showSuggestions, setShowSuggestions] = useState(true);
 
   const gradientColors = colors.backgroundGradient;
-  const headerBg = isDark ? 'rgba(15, 23, 42, 0.72)' : 'rgba(255, 255, 255, 0.72)';
-
-  const headerPulse = useSharedValue(0);
-  useEffect(() => {
-    headerPulse.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1800 }),
-        withTiming(0.4, { duration: 1800 })
-      ),
-      -1,
-      false
-    );
-  }, [headerPulse]);
-
-  const headerBadgeStyle = useAnimatedStyle(() => ({
-    shadowOpacity: interpolate(headerPulse.value, [0.4, 1], [0.15, 0.45]),
-    transform: [{ scale: interpolate(headerPulse.value, [0.4, 1], [1, 1.04]) }],
-  }));
 
   const sendMessage = async (text) => {
     const userText = (text || inputText).trim();
@@ -522,6 +499,65 @@ export default function AIChatScreen({ navigation }) {
     }
   };
 
+  const parseMessageContent = (rawText) => {
+    if (!rawText) return { cleanText: '', actions: [] };
+    let cleanText = rawText;
+    const actions = [];
+
+    // Match explicit [ACTION:TYPE|LABEL|ICON]
+    const actionRegex = /\[ACTION:([A-Z0-9_]+)(?:\|([^\|\]]+))?(?:\|([^\]]+))?\]/gi;
+    let match;
+    while ((match = actionRegex.exec(rawText)) !== null) {
+      actions.push({
+        type: match[1].toUpperCase(),
+        label: match[2] || match[1],
+        icon: match[3] || 'arrow-forward',
+      });
+    }
+    cleanText = cleanText.replace(actionRegex, '').trim();
+
+    // Match explicit [LINK:URL|LABEL]
+    const linkRegex = /\[LINK:([^\|\]]+)(?:\|([^\]]+))?\]/gi;
+    while ((match = linkRegex.exec(rawText)) !== null) {
+      actions.push({
+        type: 'LINK',
+        url: match[1],
+        label: match[2] || 'Open Link',
+        icon: 'open-outline',
+      });
+    }
+    cleanText = cleanText.replace(linkRegex, '').trim();
+
+    return { cleanText, actions };
+  };
+
+  const handleActionPress = (action) => {
+    tap();
+    switch (action.type) {
+      case 'OPEN_MAP':
+        navigation.navigate('Campus Map');
+        break;
+      case 'INSTANT_REPORT':
+        if (launchReport) launchReport(REPORT_MODE_INSTANT);
+        navigation.navigate('Report Incident');
+        break;
+      case 'REPORT_INCIDENT':
+        navigation.navigate('Report Incident');
+        break;
+      case 'EMERGENCY_CALL':
+        Linking.openURL('tel:911');
+        break;
+      case 'FEED':
+        navigation.navigate('Home');
+        break;
+      case 'LINK':
+        if (action.url) Linking.openURL(action.url);
+        break;
+      default:
+        break;
+    }
+  };
+
   const renderText = (text) => {
     const parts = text.split(/\*\*(.+?)\*\*/g);
     return parts.map((part, i) =>
@@ -533,49 +569,82 @@ export default function AIChatScreen({ navigation }) {
 
   const renderMessage = ({ item, index }) => {
     const isUser = item.role === 'user';
-    const anim = isUser ? FadeInRight.springify().springify() : FadeInLeft.delay(index === 0 ? 200 : 0).springify().springify();
+    const anim = isUser ? FadeInRight.springify().damping(15).stiffness(120) : FadeInLeft.delay(index === 0 ? 200 : 0).springify().damping(15).stiffness(120);
+    const { cleanText, actions } = isUser ? { cleanText: item.parts, actions: [] } : parseMessageContent(item.parts);
+
     return (
       <Animated.View entering={anim} style={[styles.messageRow, isUser && styles.messageRowUser]}>
         {!isUser && (
           <View style={[styles.aiAvatar, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}>
-            <Ionicons name="sparkles" size={14} color="#2563eb" />
+            <Ionicons name="hardware-chip" size={18} color="#2563eb" />
           </View>
         )}
-        <View style={[
-          styles.bubble,
-          isUser
-            ? [styles.bubbleUser, { backgroundColor: '#2563eb' }]
-            : [styles.bubbleAI, { backgroundColor: isDark ? 'rgba(30, 41, 59, 0.4)' : 'rgba(255, 255, 255, 0.5)', borderColor: isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 0.6)', overflow: 'hidden' }],
-        ]}>
-          {!isUser && <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />}
-          <Text style={[styles.bubbleText, { color: isUser ? '#ffffff' : (isDark ? '#e2e8f0' : '#0f172a') }]}>
-            {renderText(item.parts)}
-          </Text>
+        <View style={{ flex: 1, maxWidth: '84%' }}>
+          <View style={[
+            styles.bubble,
+            isUser
+              ? [styles.bubbleUser, { backgroundColor: '#2563eb' }]
+              : [styles.bubbleAI, { backgroundColor: isDark ? 'rgba(30, 41, 59, 1)' : '#ffffff', borderColor: isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 1)' }],
+          ]}>
+            <Text style={[styles.bubbleText, { color: isUser ? '#ffffff' : (isDark ? '#e2e8f0' : '#0f172a') }]}>
+              {renderText(cleanText)}
+            </Text>
+          </View>
+
+          {/* Adaptive Action Buttons & Deep Links */}
+          {actions.length > 0 && (
+            <View style={styles.actionContainer}>
+              {actions.map((act, i) => {
+                const isEmergency = act.type === 'EMERGENCY_CALL';
+                const isLink = act.type === 'LINK';
+                const bg = isEmergency
+                  ? (isDark ? 'rgba(220,38,38,0.25)' : '#fee2e2')
+                  : (isLink ? (isDark ? 'rgba(16,185,129,0.2)' : '#d1fae5') : (isDark ? 'rgba(37,99,235,0.25)' : '#eff6ff'));
+                const border = isEmergency
+                  ? '#ef4444'
+                  : (isLink ? '#10b981' : (isDark ? 'rgba(59,130,246,0.5)' : '#bfdbfe'));
+                const textColor = isEmergency
+                  ? '#ef4444'
+                  : (isLink ? '#059669' : (isDark ? '#93c5fd' : '#2563eb'));
+
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.actionBtn, { backgroundColor: bg, borderColor: border }]}
+                    onPress={() => handleActionPress(act)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name={act.icon || 'arrow-forward'} size={14} color={textColor} />
+                    <Text style={[styles.actionBtnText, { color: textColor }]}>{act.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </View>
       </Animated.View>
     );
   };
 
   const TypingIndicator = () => (
-    <Animated.View entering={FadeInLeft.springify()} style={styles.messageRow}>
+    <Animated.View entering={FadeInLeft.springify().damping(15).stiffness(120)} style={styles.messageRow}>
       <View style={[styles.aiAvatar, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }]}>
-        <Ionicons name="sparkles" size={14} color="#2563eb" />
+        <Ionicons name="hardware-chip" size={18} color="#2563eb" />
       </View>
       <View style={{ gap: 6 }}>
-        <Animated.View entering={FadeInUp.delay(100).springify()} style={styles.resourceStep}>
+        <Animated.View entering={FadeInUp.delay(100).springify().damping(15).stiffness(120)} style={styles.resourceStep}>
           <Ionicons name="location-outline" size={12} color={colors.textSecondary} />
           <Text style={[styles.resourceStepText, { color: colors.textSecondary }]}>Accessing Live Location...</Text>
         </Animated.View>
-        <Animated.View entering={FadeInUp.delay(800).springify()} style={styles.resourceStep}>
+        <Animated.View entering={FadeInUp.delay(800).springify().damping(15).stiffness(120)} style={styles.resourceStep}>
           <Ionicons name="document-text-outline" size={12} color={colors.textSecondary} />
           <Text style={[styles.resourceStepText, { color: colors.textSecondary }]}>Fetching Campus Reports...</Text>
         </Animated.View>
-        <Animated.View entering={FadeInUp.delay(1500).springify()} style={styles.resourceStep}>
+        <Animated.View entering={FadeInUp.delay(1500).springify().damping(15).stiffness(120)} style={styles.resourceStep}>
           <Ionicons name="analytics-outline" size={12} color={colors.textSecondary} />
           <Text style={[styles.resourceStepText, { color: colors.textSecondary }]}>Analyzing Context...</Text>
         </Animated.View>
-        <View style={[styles.bubble, styles.bubbleAI, styles.typingBubble, { backgroundColor: isDark ? 'rgba(30, 41, 59, 0.4)' : 'rgba(255, 255, 255, 0.5)', borderColor: isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 0.6)', overflow: 'hidden', alignSelf: 'flex-start' }]}>
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
+        <View style={[styles.bubble, styles.bubbleAI, styles.typingBubble, { backgroundColor: isDark ? 'rgba(30, 41, 59, 1)' : '#ffffff', borderColor: isDark ? 'rgba(51, 65, 85, 0.4)' : 'rgba(226, 232, 240, 1)', alignSelf: 'flex-start' }]}>
           <TypingDots color="#2563eb" />
         </View>
       </View>
@@ -591,32 +660,60 @@ export default function AIChatScreen({ navigation }) {
     }
   };
 
+  const renderBentoGrid = () => (
+    <Animated.View entering={FadeInDown.springify().damping(15).stiffness(120)} style={styles.bentoGrid}>
+      {SUGGESTED_PROMPTS.map((item, i) => {
+        let iconBgColor = '#2563eb15'; // Default primary soft
+        let iconColor = '#2563eb'; // Default primary
+        if (item.theme === 'secondary') { iconBgColor = '#ffbf0020'; iconColor = '#d97706'; } // Darker amber
+        else if (item.theme === 'tertiary') { iconBgColor = '#9f001215'; iconColor = '#9f0012'; }
+
+        return (
+          <Animated.View key={item.id} entering={FadeInUp.delay(i * 100).springify().damping(15).stiffness(120)} style={styles.bentoItemWrapper}>
+            <TouchableOpacity
+              style={[styles.bentoCard, { backgroundColor: isDark ? '#1e293b' : '#ffffff', borderColor: isDark ? '#334155' : '#e2e8f0' }]}
+              onPress={() => sendMessage(item.prompt)}
+              onPressIn={tap}
+              activeOpacity={0.7}
+            >
+              <View style={styles.bentoCardContent}>
+                <View style={[styles.bentoIconWrap, { backgroundColor: iconBgColor }]}>
+                  <Ionicons name={item.icon} size={20} color={iconColor} />
+                </View>
+                <View style={styles.bentoTextWrap}>
+                  <Text style={[styles.bentoTitle, { color: isDark ? '#f1f5f9' : '#0f172a' }]} numberOfLines={1}>{item.title}</Text>
+                  <Text style={[styles.bentoDesc, { color: isDark ? '#94a3b8' : '#64748b' }]} numberOfLines={2}>{item.description}</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+        );
+      })}
+    </Animated.View>
+  );
+
   return (
     <View style={styles.container}>
       <LinearGradient colors={gradientColors} style={StyleSheet.absoluteFillObject} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
       <AmbientBackground isDark={isDark} />
       <GlowingEdge isDark={isDark} />
 
-      <View style={styles.flex}>
-        <Animated.View
-          entering={FadeInDown.springify()}
-          style={[styles.header, { paddingTop: insets.top + 4, backgroundColor: headerBg, borderBottomColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(226, 232, 240, 0.8)' }]}
-        >
-          <TouchableOpacity style={styles.backBtn} onPress={handleBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={22} color={isDark ? '#f1f5f9' : '#0f172a'} />
-          </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            <Animated.View style={[styles.headerAIBadge, { backgroundColor: isDark ? '#1e3a5f' : '#dbeafe' }, headerBadgeStyle]}>
-              <Ionicons name="sparkles" size={16} color="#2563eb" />
-            </Animated.View>
-            <View>
-              <Text style={[styles.headerTitle, { color: isDark ? '#f1f5f9' : '#0f172a' }]}>CampusWatch AI</Text>
-              <Text style={[styles.headerSub, { color: isDark ? '#94a3b8' : '#64748b' }]}>Powered by PinayAI</Text>
-            </View>
-          </View>
-          <View style={styles.headerSpacer} />
-        </Animated.View>
+      {/* Floating Header */}
+      <Animated.View entering={FadeInLeft.springify().damping(14).stiffness(220)} style={[styles.floatingHeaderWrap, { top: insets.top + 8 }]}>
+        <TouchableOpacity style={[styles.floatingBackBtn, { backgroundColor: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.8)' }]} onPress={handleBack}>
+          <BlurView intensity={isDark ? 30 : 60} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
+          <Ionicons name="arrow-back" size={24} color={isDark ? '#f1f5f9' : '#0f172a'} />
+        </TouchableOpacity>
+        <View style={styles.floatingHeaderTitles}>
+          <Text style={[styles.floatingHeaderTitle, { color: isDark ? '#f1f5f9' : '#0f172a' }]}>CampusWatch AI</Text>
+          <Text style={[styles.floatingHeaderSub, { color: isDark ? '#94a3b8' : '#64748b' }]}>by PinayAI</Text>
+        </View>
+      </Animated.View>
 
+      <KeyboardAvoidingView 
+        style={[styles.flex, { paddingTop: insets.top + 60 }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         {pageLoading ? (
           <ChatLoadingScreen isDark={isDark} colors={colors} />
         ) : (
@@ -625,8 +722,15 @@ export default function AIChatScreen({ navigation }) {
               ref={flatListRef}
               data={messages}
               keyExtractor={(item) => item.id}
-              renderItem={renderMessage}
               contentContainerStyle={[styles.messageList, { paddingBottom: 12 }]}
+              ListHeaderComponent={() => (
+                <View style={styles.todayBadgeWrap}>
+                   <View style={[styles.todayBadge, { backgroundColor: isDark ? '#334155' : '#f1f5f9' }]}>
+                     <Text style={[styles.todayBadgeText, { color: isDark ? '#cbd5e1' : '#64748b' }]}>TODAY</Text>
+                   </View>
+                </View>
+              )}
+              renderItem={renderMessage}
               ListFooterComponent={isTyping ? <TypingIndicator /> : null}
               onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
               keyboardShouldPersistTaps="handled"
@@ -635,22 +739,9 @@ export default function AIChatScreen({ navigation }) {
             />
 
             {showSuggestions && (
-              <Animated.View entering={FadeInDown.springify()} style={styles.suggestionsWrapper}>
-                <Text style={[styles.suggestionsLabel, { color: isDark ? '#94a3b8' : '#64748b' }]}>Try asking:</Text>
-                <View style={styles.suggestionsRow}>
-                  {SUGGESTED_PROMPTS.map((prompt, i) => (
-                    <Animated.View key={prompt} entering={FadeInUp.delay(i * 80).duration(350).springify()}>
-                      <TouchableOpacity
-                        style={[styles.suggestionChip, { backgroundColor: isDark ? 'rgba(30, 58, 95, 0.85)' : 'rgba(239, 246, 255, 0.95)', borderColor: isDark ? 'rgba(37, 99, 235, 0.35)' : '#bfdbfe' }]}
-                        onPress={() => sendMessage(prompt)}
-                        onPressIn={tap}
-                      >
-                        <Text style={[styles.suggestionChipText, { color: '#2563eb' }]}>{prompt}</Text>
-                      </TouchableOpacity>
-                    </Animated.View>
-                  ))}
-                </View>
-              </Animated.View>
+              <View style={styles.suggestionsWrapper}>
+                {renderBentoGrid()}
+              </View>
             )}
           </>
         )}
@@ -667,7 +758,7 @@ export default function AIChatScreen({ navigation }) {
             tap={tap}
           />
         )}
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -689,78 +780,159 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     overflow: 'hidden',
   },
-  header: {
+  
+  // Floating Header
+  floatingHeaderWrap: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 50,
     flexDirection: 'row',
-    marginHorizontal: 16,
-    borderRadius: 20,
+    alignItems: 'center',
+    gap: 12,
+  },
+  floatingBackBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
     overflow: 'hidden',
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerSpacer: { width: 36 },
-  headerAIBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#2563eb',
-    shadowRadius: 8,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  headerTitle: { fontSize: 16, fontWeight: '800' },
-  headerSub: { fontSize: 11, fontWeight: '500', marginTop: 1 },
+  floatingHeaderTitles: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+  },
+  floatingHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  floatingHeaderSub: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: -1,
+  },
+
   messageList: { padding: 16, paddingBottom: 8 },
-  messageRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 12, gap: 8 },
+  
+  todayBadgeWrap: {
+    alignItems: 'center',
+    marginBottom: 24,
+    marginTop: 8,
+  },
+  todayBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  todayBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+
+  messageRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16, gap: 10 },
   messageRowUser: { flexDirection: 'row-reverse' },
-  aiAvatar: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  bubble: { maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
-  bubbleUser: { borderBottomRightRadius: 4 },
-  bubbleAI: { borderWidth: 1, borderBottomLeftRadius: 4 },
-  bubbleText: { fontSize: 14, lineHeight: 20 },
+  aiAvatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  bubble: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20 },
+  bubbleUser: { borderTopRightRadius: 4 }, // Sharp top right for user
+  bubbleAI: { borderWidth: 1, borderTopLeftRadius: 4 }, // Sharp top left for AI
+  bubbleText: { fontSize: 15, lineHeight: 22 },
   typingBubble: { paddingVertical: 14, paddingHorizontal: 16 },
   typingDots: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   typingDot: { width: 7, height: 7, borderRadius: 3.5 },
-  suggestionsWrapper: { paddingHorizontal: 16, paddingBottom: 8 },
-  suggestionsLabel: { fontSize: 11, fontWeight: '600', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  suggestionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  suggestionChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1 },
-  suggestionChipText: { fontSize: 12, fontWeight: '600' },
-  inputBarOuter: {
-    borderRadius: 24,
-    marginHorizontal: 12,
-    overflow: 'hidden',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 10,
+  
+  actionContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  inputGlowRing: {
-    position: 'absolute',
-    top: 6,
-    left: 10,
-    right: 10,
-    height: 52,
-    borderRadius: 26,
-    overflow: 'hidden',
+  actionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  input: { flex: 1, borderRadius: 20, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 100 },
-  sendBtn: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
+  
+  suggestionsWrapper: { paddingHorizontal: 16, paddingBottom: 8 },
+  bentoGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  bentoItemWrapper: { width: '48%', marginBottom: 12 },
+  bentoCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  bentoCardContent: { flexDirection: 'column', alignItems: 'flex-start', gap: 8 },
+  bentoIconWrap: {
+    padding: 8,
+    borderRadius: 12,
+  },
+  bentoTextWrap: { gap: 2 },
+  bentoTitle: { fontSize: 14, fontWeight: '700' },
+  bentoDesc: { fontSize: 12, lineHeight: 16 },
+
+  inputBarOuter: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    backgroundColor: 'transparent',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 30,
+    borderWidth: 1.5,
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inputAddBtn: {
+    padding: 8,
+  },
+  input: { 
+    flex: 1, 
+    fontSize: 15, 
+    maxHeight: 100, 
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  sendBtn: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+
   loadingContent: { flex: 1, padding: 24, justifyContent: 'center' },
   loadingHero: { alignItems: 'center', marginBottom: 32 },
   loadingHeroRingWrap: { width: 80, height: 80, marginBottom: 14, justifyContent: 'center', alignItems: 'center' },

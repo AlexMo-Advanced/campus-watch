@@ -1,10 +1,20 @@
 name: Local Android APK Build
 
 on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile to use'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - preview
+          - development
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 jobs:
   build:
@@ -34,7 +44,12 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        
+        with:
+          packages: 'platform-tools'
+
+      - name: Install SDK platform and build-tools
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
       - name: Accept Android SDK Licenses & Install NDK
         run: |
           yes | sdkmanager --licenses
@@ -45,7 +60,7 @@ jobs:
         run: npm ci
 
       - name: Run Local EAS Build
-        run: eas build --local --platform android --profile production --non-interactive --output ./build/app.apk
+        run: eas build --local --platform android --profile ${{ github.event.inputs.profile || 'production' }} --non-interactive --output ./build/app.apk
         env:
           EAS_LOCAL_BUILD_SKIP_CLEANUP: "1"
           EAS_NO_VCS: "1"

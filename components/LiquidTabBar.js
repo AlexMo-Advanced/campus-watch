@@ -25,6 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFeedback } from '../lib/useFeedback';
+import { useFeedViewMode } from '../lib/FeedViewModeContext';
 import { useReportMode } from '../lib/ReportModeContext';
 import { TAB_BAR_BOTTOM_GAP, TAB_BAR_HEIGHT } from '../lib/tabBarLayout';
 import { useTabBarScrollControls } from '../lib/TabBarScrollContext';
@@ -41,6 +42,7 @@ const TAB_DEFS = [
 ];
 
 const REPORT_INDEX = 2;
+const FEED_INDEX = 1;
 const AI_TAB_INDEX = 4;
 
 const { width: SW } = Dimensions.get('window');
@@ -140,7 +142,9 @@ export default function FloatingTabBar({ state, navigation }) {
   const { openPicker } = useReportMode();
   const { setReportingActive } = useLockdown();
   const { tabPress, tabLongPress, tabDragSnap, barPress } = useFeedback();
+  const { mode: feedViewMode } = useFeedViewMode();
   const isAITab = state.index === AI_TAB_INDEX;
+  const isFeedImmersive = state.index === FEED_INDEX && feedViewMode === 'immersive';
   const shouldForceHide = isAITab || hiddenLockCount > 0;
   const bottomInset = Math.max(insets.bottom + BOTTOM_GAP, BOTTOM_GAP) - 16;
 
@@ -268,16 +272,20 @@ export default function FloatingTabBar({ state, navigation }) {
   }));
 
   const ambientColor = colors.backgroundGradient?.[colors.backgroundGradient.length - 1] || colors.background;
-  const glassTintColor = colors.tabBarGlass;
-  const blurTint = colors.tabBarBlur;
-  const specularColors = isDark
-    ? [hexToRgba(colors.primary, 0.14), hexToRgba(ambientColor, 0.06), 'rgba(0,0,0,0)']
-    : ['rgba(255,255,255,0.55)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0)'];
-  const touchGlowColors = isDark
-    ? [hexToRgba(colors.primary, 0.28), 'rgba(0,0,0,0)']
-    : ['rgba(255,255,255,0.5)', 'rgba(255,255,255,0)'];
-  const pulseOverlayColor = isDark ? colors.primary : '#ffffff';
-  const innerBorderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.35)';
+  const glassTintColor = isFeedImmersive ? 'transparent' : colors.tabBarGlass;
+  const blurTint = isFeedImmersive ? 'dark' : colors.tabBarBlur;
+  const specularColors = isFeedImmersive
+    ? ['transparent', 'transparent', 'transparent']
+    : isDark
+      ? [hexToRgba(colors.primary, 0.14), hexToRgba(ambientColor, 0.06), 'rgba(0,0,0,0)']
+      : ['rgba(255,255,255,0.55)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0)'];
+  const touchGlowColors = isFeedImmersive
+    ? ['transparent', 'transparent']
+    : isDark
+      ? [hexToRgba(colors.primary, 0.28), 'rgba(0,0,0,0)']
+      : ['rgba(255,255,255,0.5)', 'rgba(255,255,255,0)'];
+  const pulseOverlayColor = isFeedImmersive ? 'transparent' : (isDark ? colors.primary : '#ffffff');
+  const innerBorderColor = isFeedImmersive ? 'transparent' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.35)');
 
   return (
     <Animated.View
@@ -288,9 +296,11 @@ export default function FloatingTabBar({ state, navigation }) {
           left: SIDE_MARGIN,
           right: SIDE_MARGIN,
           bottom: bottomInset,
-          borderColor: colors.tabBarBorder,
-          shadowColor: isDark ? ambientColor : '#2563eb',
-          shadowOpacity: isDark ? 0.45 : 0.18,
+          borderColor: isFeedImmersive ? 'transparent' : colors.tabBarBorder,
+          shadowColor: isFeedImmersive ? 'transparent' : (isDark ? ambientColor : '#2563eb'),
+          shadowOpacity: isFeedImmersive ? 0 : (isDark ? 0.45 : 0.18),
+          backgroundColor: isFeedImmersive ? '#000' : 'transparent',
+          borderWidth: isFeedImmersive ? 0 : 1,
         },
         floatingStyle,
       ]}
@@ -300,7 +310,7 @@ export default function FloatingTabBar({ state, navigation }) {
       onResponderTerminate={onBarPressOut}
     >
       <BlurView
-        intensity={Platform.OS === 'ios' ? 88 : 72}
+        intensity={isFeedImmersive ? 0 : (Platform.OS === 'ios' ? 88 : 72)}
         tint={blurTint}
         style={styles.blurView}
         experimentalBlurMethod="dimezisBlurView"
@@ -379,6 +389,8 @@ const styles = StyleSheet.create({
     shadowRadius: 28,
     elevation: 16,
     borderWidth: 1,
+    backgroundColor: 'transparent',
+    zIndex: 10,
   },
   blurView: {
     flex: 1,
@@ -415,7 +427,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   tabBtn: {
-    width: TAB_W,
+    flex: 1,
     height: BAR_H,
     alignItems: 'center',
     justifyContent: 'center',

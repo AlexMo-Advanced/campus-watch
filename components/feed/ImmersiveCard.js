@@ -1,10 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
-
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+import React, { useCallback, useEffect, useState } from 'react';
+import ImageCarousel from './ImageCarousel';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { fetchReportLikeMeta, toggleReportLike } from '../../lib/likes';
+import { supabase } from '../../lib/supabase';
+import { useFeedback } from '../../lib/useFeedback';
+import { TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_GAP } from '../../lib/tabBarLayout';
 
 // Severity background gradients for cards with no image
 const SEVERITY_BG = {
@@ -43,22 +47,102 @@ function formatTimestamp(isoString) {
   return date.toLocaleDateString();
 }
 
-export default function ImmersiveCard({ report, isActive }) {
-  const severityBg = SEVERITY_BG[report.severity] ?? SEVERITY_BG.default;
-  const hasImage = !!report.image_url;
+function getSeverityAccent(severity) {
+  switch (severity) {
+    case 'Crisis': return 'rgba(168,85,247,0.85)';
+    case 'High':   return 'rgba(239,68,68,0.85)';
+    case 'Medium': return 'rgba(245,158,11,0.85)';
+    default:       return 'rgba(99,102,241,0.85)';
+  }
+}
+
+// ---------- Inline Like Button (white, vertical, TikTok-style) ----------
+function ImmersiveLikeButton({ reportId }) {
+  const { tap, like } = useFeedback();
+  const [likeCount, setLikeCount] = useState(0);
+  const [likedByMe, setLikedByMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState(null);
+
+  const refresh = useCallback(async () => {
+    if (!reportId) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    setUserId(user?.id || null);
+    const meta = await fetchReportLikeMeta(reportId, user?.id);
+    setLikeCount(meta.likeCount);
+    setLikedByMe(meta.likedByMe);
+  }, [reportId]);
+
+  useEffect(() => {
+    refresh();
+    if (!reportId) return undefined;
+    const channel = supabase
+      .channel(`immersive_likes_${reportId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'report_likes', filter: `report_id=eq.${reportId}` }, () => refresh())
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [reportId, refresh]);
+
+  const handlePress = async () => {
+    if (!userId) { Alert.alert('Sign In Required', 'Please sign in to like reports.'); return; }
+    tap();
+    setLoading(true);
+    try {
+      const next = await toggleReportLike(reportId, userId, likedByMe);
+      setLikedByMe(next);
+      setLikeCount((c) => (next ? c + 1 : Math.max(0, c - 1)));
+      if (next) like();
+    } catch { /* silent */ } finally { setLoading(false); }
+  };
 
   return (
-    <View style={styles.card}>
-      {/* Background: image or severity gradient */}
-      {hasImage ? (
-        <Image
-          source={{ uri: report.image_url }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          transition={200}
-          // Only eagerly decode when this card is the active one
-          priority={isActive ? 'high' : 'low'}
-        />
+    <TouchableOpacity style={actionStyles.actionBtn} onPress={handlePress} disabled={loading} activeOpacity={0.7}>
+      {loading ? (
+        <ActivityIndicator size="small" color="#fff" />
+      ) : (
+        <Ionicons name={likedByMe ? 'heart' : 'heart-outline'} size={28} color={likedByMe ? '#ef4444' : '#fff'} />
+      )}
+      <Text style={actionStyles.actionLabel}>{likeCount > 0 ? `${likeCount}` : 'Like'}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ---------- Main Component ----------
+export default function ImmersiveCard({ report, isActive, onComment, onExpand, onShare, height }) {
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  
+  const severityBg = SEVERITY_BG[report.severity] ?? SEVERITY_BG.default;
+  const hasImage = !!report.image_url;
+  // Position content above the tab bar area
+  const tabBarClearance = TAB_BAR_HEIGHT + Math.max(insets.bottom + TAB_BAR_BOTTOM_GAP, TAB_BAR_BOTTOM_GAP);
+
+  return (
+    <View style={[styles.card, { height, width }]}>
+      {/* ── Background layer ── */}
+      {report.image_urls && report.image_urls.length > 0 ? (
+        <ImageCarousel imageUrls={report.image_urls} width={width} height={height} isImmersive={true} />
+      ) : hasImage ? (
+        <>
+          {/* Blurred full-bleed backdrop so no black bars show */}
+          <Image
+            source={{ uri: report.image_url }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            blurRadius={25}
+            priority={isActive ? 'normal' : 'low'}
+          />
+          {/* Dark tint over blurred backdrop */}
+          <View style={styles.blurTint} />
+          {/* Sharp image, properly contained to preserve aspect ratio */}
+          <Image
+            source={{ uri: report.image_url }}
+            style={styles.mainImage}
+            contentFit="contain"
+            transition={200}
+            priority={isActive ? 'high' : 'low'}
+          />
+        </>
       ) : (
         <LinearGradient colors={severityBg} style={StyleSheet.absoluteFill} />
       )}
@@ -67,10 +151,10 @@ export default function ImmersiveCard({ report, isActive }) {
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.88)']}
         locations={[0, 0.5, 1]}
-        style={styles.scrim}
+        style={[styles.scrim, { height: height * 0.55 }]}
       />
 
-      {/* Top scrim for status/category area */}
+      {/* Top scrim */}
       <LinearGradient
         colors={['rgba(0,0,0,0.45)', 'transparent']}
         style={styles.topScrim}
@@ -85,8 +169,40 @@ export default function ImmersiveCard({ report, isActive }) {
         </View>
       </View>
 
-      {/* Bottom overlay: content */}
-      <View style={styles.overlay}>
+      {/* ── Right-side action column (TikTok-style) ── */}
+      <View style={[actionStyles.actionColumn, { bottom: tabBarClearance + 20 }]}>
+        <ImmersiveLikeButton reportId={report.id} />
+
+        <TouchableOpacity
+          style={actionStyles.actionBtn}
+          onPress={() => onComment?.(report)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chatbubble-outline" size={26} color="#fff" />
+          <Text style={actionStyles.actionLabel}>Comment</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={actionStyles.actionBtn}
+          onPress={() => onExpand?.(report)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="expand-outline" size={26} color="#fff" />
+          <Text style={actionStyles.actionLabel}>Expand</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={actionStyles.actionBtn}
+          onPress={() => onShare?.(report)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="share-social-outline" size={26} color="#fff" />
+          <Text style={actionStyles.actionLabel}>Share</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Bottom overlay: content ── */}
+      <View style={[styles.overlay, { bottom: tabBarClearance + 10 }]}>
         {/* Severity + Category row */}
         <View style={styles.badgeRow}>
           {report.severity && report.severity !== 'Low' && (
@@ -140,27 +256,51 @@ export default function ImmersiveCard({ report, isActive }) {
   );
 }
 
-function getSeverityAccent(severity) {
-  switch (severity) {
-    case 'Crisis': return 'rgba(168,85,247,0.85)';
-    case 'High':   return 'rgba(239,68,68,0.85)';
-    case 'Medium': return 'rgba(245,158,11,0.85)';
-    default:       return 'rgba(99,102,241,0.85)';
-  }
-}
+// ── Action column styles ──
+const actionStyles = StyleSheet.create({
+  actionColumn: {
+    position: 'absolute',
+    right: 10,
+    bottom: 180,
+    alignItems: 'center',
+    gap: 20,
+    zIndex: 10,
+  },
+  actionBtn: {
+    alignItems: 'center',
+    gap: 3,
+  },
+  actionLabel: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+});
 
+// ── Card styles ──
 const styles = StyleSheet.create({
   card: {
-    height: SCREEN_HEIGHT,
-    width: SCREEN_WIDTH,
     backgroundColor: '#000',
+  },
+  blurTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  mainImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   scrim: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.55,
   },
   topScrim: {
     position: 'absolute',
@@ -189,7 +329,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 40,
     left: 16,
-    right: 16,
+    right: 70, // leave room for action column on the right
   },
   badgeRow: {
     flexDirection: 'row',

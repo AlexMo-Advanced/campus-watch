@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -12,15 +14,13 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Image,
 } from 'react-native';
-import MapView, { Callout, Marker } from '../components/CustomMapView';
 import CommentSection from '../components/CommentSection';
+import MapView, { Callout, Marker } from '../components/CustomMapView';
 import ReportLikeButton from '../components/ReportLikeButton';
 import ShareReportSheet from '../components/ShareReportSheet';
-import { LinearGradient } from 'expo-linear-gradient';
-import { NOTIFICATION_TYPES } from '../lib/notifications';
 import { useNotifications } from '../lib/NotificationContext';
+import { NOTIFICATION_TYPES } from '../lib/notifications';
 import { supabase } from '../lib/supabase';
 import { useTabBarScrollControls } from '../lib/TabBarScrollContext';
 import { useTheme } from '../lib/ThemeContext';
@@ -57,7 +57,7 @@ export default function MapScreen() {
     placeholder: themeColors.surfaceSecondary,
   };
   const styles = getStyles(colors);
-  
+
   const mapRef = useRef(null);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +90,7 @@ export default function MapScreen() {
       if (error) throw error;
       const validReports = (data || []).filter(
         (r) => r.latitude != null && r.longitude != null &&
-               !isNaN(r.latitude) && !isNaN(r.longitude)
+          !isNaN(r.latitude) && !isNaN(r.longitude)
       );
       setReports(validReports);
       checkNearbyReports(validReports);
@@ -111,7 +111,7 @@ export default function MapScreen() {
         setMapRegion({ latitude, longitude, latitudeDelta: 0.012, longitudeDelta: 0.012 });
         return;
       }
-    } catch (_) {}
+    } catch (_) { }
     setMapRegion(DEFAULT_REGION);
   };
 
@@ -140,7 +140,7 @@ export default function MapScreen() {
         mapRef.current?.animateToRegion(region, 800);
         return;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     if (reportList.length > 0 && mapRef.current) {
       mapRef.current.fitToCoordinates(
@@ -363,10 +363,10 @@ export default function MapScreen() {
                     <Text style={[
                       styles.categoryBadge,
                       selectedReport.severity === 'Crisis' ? { backgroundColor: '#fce7f3', color: '#9d174d' } :
-                      selectedReport.severity === 'High' ? { backgroundColor: '#fee2e2', color: '#dc2626' } :
-                      selectedReport.severity === 'Medium' ? { backgroundColor: '#fef3c7', color: '#d97706' } :
-                      selectedReport.severity === 'Low' ? { backgroundColor: '#dcfce7', color: '#16a34a' } :
-                      {}
+                        selectedReport.severity === 'High' ? { backgroundColor: '#fee2e2', color: '#dc2626' } :
+                          selectedReport.severity === 'Medium' ? { backgroundColor: '#fef3c7', color: '#d97706' } :
+                            selectedReport.severity === 'Low' ? { backgroundColor: '#dcfce7', color: '#16a34a' } :
+                              {}
                     ]}>
                       {selectedReport.severity}
                     </Text>

@@ -1,11 +1,16 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { Dimensions, FlatList, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { FlatList, StyleSheet, View } from 'react-native';
+import { useTabBarScrollControls } from '../../lib/TabBarScrollContext';
 import ImmersiveCard from './ImmersiveCard';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-export default function ImmersiveFeed({ reports }) {
+export default function ImmersiveFeed({ reports, onComment, onExpand, onShare }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(0);
+  const { showTabBar } = useTabBarScrollControls();
+
+  useEffect(() => {
+    showTabBar?.();
+  }, [showTabBar]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0) {
@@ -17,36 +22,52 @@ export default function ImmersiveFeed({ reports }) {
     itemVisiblePercentThreshold: 60,
   }).current;
 
+  const handleLayout = useCallback((e) => {
+    setContainerHeight(e.nativeEvent.layout.height);
+  }, []);
+
   const renderItem = useCallback(
     ({ item, index }) => (
-      <ImmersiveCard report={item} isActive={index === activeIndex} />
+      <ImmersiveCard
+        report={item}
+        isActive={index === activeIndex}
+        onComment={onComment}
+        onExpand={onExpand}
+        onShare={onShare}
+        height={containerHeight}
+      />
     ),
-    [activeIndex]
+    [activeIndex, onComment, onExpand, onShare, containerHeight]
   );
 
   return (
-    <FlatList
-      data={reports}
-      renderItem={renderItem}
-      keyExtractor={(item) => String(item.id)}
-      pagingEnabled
-      showsVerticalScrollIndicator={false}
-      decelerationRate="fast"
-      snapToInterval={SCREEN_HEIGHT}
-      snapToAlignment="start"
-      getItemLayout={(_data, index) => ({
-        length: SCREEN_HEIGHT,
-        offset: SCREEN_HEIGHT * index,
-        index,
-      })}
-      onViewableItemsChanged={onViewableItemsChanged}
-      viewabilityConfig={viewabilityConfig}
-      initialNumToRender={2}
-      windowSize={3}
-      maxToRenderPerBatch={2}
-      removeClippedSubviews
-      style={styles.container}
-    />
+    <View style={styles.container} onLayout={handleLayout}>
+      {containerHeight > 0 && (
+        <FlatList
+          data={reports}
+          renderItem={renderItem}
+          keyExtractor={(item) => String(item.id)}
+          pagingEnabled
+          showsVerticalScrollIndicator={false}
+          decelerationRate="fast"
+          snapToInterval={containerHeight}
+          snapToAlignment="start"
+          getItemLayout={(_data, index) => ({
+            length: containerHeight,
+            offset: containerHeight * index,
+            index,
+          })}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          scrollEventThrottle={16}
+          initialNumToRender={2}
+          windowSize={3}
+          maxToRenderPerBatch={2}
+          removeClippedSubviews
+          style={{ flex: 1 }}
+        />
+      )}
+    </View>
   );
 }
 

@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Camera as VisionCamera, useCameraDevice, useCameraPermission as useVisionCameraPermission } from 'react-native-vision-camera';
+import { CameraView, useCameraPermissions as useExpoCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -19,24 +21,46 @@ export default function InstantReportCameraScreen({ onPhotoTaken, onSwitchToStan
   const insets = useSafeAreaInsets();
   const { medium } = useFeedback();
   const cameraRef = useRef(null);
-  const [permission, requestPermission] = useCameraPermissions();
+  const isWeb = Platform.OS === 'web';
+
+  // Vision Camera (Native) hooks
+  const visionPerm = useVisionCameraPermission();
   const [facing, setFacing] = useState('back');
+  const device = useCameraDevice(facing);
+
+  // Expo Camera (Web) hooks
+  const [expoPerm, requestExpoPerm] = useExpoCameraPermissions();
+
   const [capturing, setCapturing] = useState(false);
   const [flash, setFlash] = useState('off');
 
+  const hasPermission = isWeb ? expoPerm?.granted : visionPerm.hasPermission;
+  const requestPermission = isWeb ? requestExpoPerm : visionPerm.requestPermission;
+
   useEffect(() => {
-    if (!permission?.granted) {
+    if (!hasPermission && hasPermission !== null) {
       requestPermission();
     }
-  }, [permission, requestPermission]);
+  }, [hasPermission, requestPermission]);
 
   const takePhoto = async () => {
     if (!cameraRef.current || capturing) return;
     setCapturing(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.85, skipProcessing: false });
-      if (photo?.uri) {
-        onPhotoTaken(photo.uri);
+      if (isWeb) {
+        const photo = await cameraRef.current.takePictureAsync({ quality: 0.85, skipProcessing: false });
+        if (photo?.uri) {
+          onPhotoTaken(photo.uri);
+        }
+      } else {
+        const photo = await cameraRef.current.takePhoto({ 
+          qualityPrioritization: 'speed',
+          enableShutterSound: false,
+          flash: flash === 'on' ? 'on' : 'off',
+        });
+        if (photo?.path) {
+          onPhotoTaken(`file://${photo.path}`);
+        }
       }
     } catch {
       Alert.alert('Camera Error', 'Could not capture photo. Please try again.');
@@ -55,7 +79,7 @@ export default function InstantReportCameraScreen({ onPhotoTaken, onSwitchToStan
     }
   };
 
-  if (!permission) {
+  if (hasPermission === null) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#2563eb" />
@@ -63,7 +87,7 @@ export default function InstantReportCameraScreen({ onPhotoTaken, onSwitchToStan
     );
   }
 
-  if (!permission.granted) {
+  if (!hasPermission) {
     return (
       <View style={styles.permissionScreen}>
         <Ionicons name="camera-outline" size={56} color="#94a3b8" />
@@ -81,12 +105,24 @@ export default function InstantReportCameraScreen({ onPhotoTaken, onSwitchToStan
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        style={StyleSheet.absoluteFillObject}
-        facing={facing}
-        flash={flash}
-      />
+      {isWeb ? (
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFillObject}
+          facing={facing}
+          flash={flash}
+        />
+      ) : device ? (
+        <VisionCamera
+          ref={cameraRef}
+          style={StyleSheet.absoluteFillObject}
+          device={device}
+          isActive={true}
+          photo={true}
+        />
+      ) : (
+        <View style={StyleSheet.absoluteFillObject} backgroundColor="#000" />
+      )}
 
       {/* Top overlay */}
       <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
