@@ -53,7 +53,6 @@ export default function InstantReportCameraScreen({ onPhotoTaken, onSwitchToStan
           onPhotoTaken(photo.uri);
         }
       } else {
-        console.log('cameraRef.current at capture time:', cameraRef.current);
         if (typeof cameraRef.current?.takePhoto !== 'function') {
           // Native bridge not ready — most likely the react-native-vision-camera
           // plugin is missing from app.json or the dev client needs a rebuild.
