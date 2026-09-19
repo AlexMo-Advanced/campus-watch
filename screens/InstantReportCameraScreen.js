@@ -115,6 +115,8 @@ export default function InstantReportCameraScreen({ onPhotoTaken, onSwitchToStan
     );
   }
 
+  console.log('isWeb:', isWeb, '| device:', device);
+
   return (
     <View style={styles.container}>
       {isWeb ? (
