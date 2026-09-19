@@ -59,6 +59,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Debug expo config
+        run: npx expo config
+
+
       - name: Run Local EAS Build
         run: eas build --local --platform android --profile ${{ github.event.inputs.profile || 'production' }} --non-interactive --output ./build/app.apk
         env:
