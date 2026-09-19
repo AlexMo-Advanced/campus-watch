@@ -40,6 +40,7 @@ import { ReportModeProvider } from '../lib/ReportModeContext';
 import { flushQueue } from '../lib/reportQueue';
 import { supabase } from '../lib/supabase';
 import { initArchivingService } from '../lib/archivingService';
+import { registerNowBarTask } from '../lib/background/NowBarService';
 import AIChatScreen from '../screens/AIChatScreen';
 import AdminScreen from '../screens/AdminScreen';
 import AuthScreen from '../screens/AuthScreen';
@@ -398,6 +399,9 @@ export default function RootLayout() {
   useEffect(() => {
     registerServiceWorker();
     initArchivingService();
+    if (Platform.OS !== 'web') {
+      registerNowBarTask();
+    }
   }, []);
 
   return (

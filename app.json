@@ -35,6 +35,7 @@
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.POST_NOTIFICATIONS",
+        "android.permission.POST_PROMOTED_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
         "android.permission.CAMERA"
@@ -105,6 +106,7 @@
           "enableMicrophonePermission": false
         }
       ],
+      "./modules/live-notifications",
       "./plugins/withGradleFixes",
       "expo-localization"
     ],
