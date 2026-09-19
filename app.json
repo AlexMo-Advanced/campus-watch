@@ -106,7 +106,6 @@
           "enableMicrophonePermission": false
         }
       ],
-      "./modules/live-notifications",
       "./plugins/withGradleFixes",
       "expo-localization"
     ],
