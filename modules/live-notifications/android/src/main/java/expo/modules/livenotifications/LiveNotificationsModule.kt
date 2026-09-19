@@ -18,7 +18,7 @@ class LiveNotificationsModule : Module() {
     Name("LiveNotifications")
 
     Function("startLiveNotification") { title: String, content: String, data: Map<String, Any>? ->
-      val context = appContext.reactContext ?: return@Function
+      val context = appContext.reactContext ?: return@Function null
       createNotificationChannel(context)
 
       val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
@@ -50,10 +50,11 @@ class LiveNotificationsModule : Module() {
 
       val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       notificationManager.notify(NOTIFICATION_ID, builder.build())
+      null
     }
 
     Function("updateLiveNotification") { content: String, data: Map<String, Any>? ->
-      val context = appContext.reactContext ?: return@Function
+      val context = appContext.reactContext ?: return@Function null
       
       val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -79,12 +80,14 @@ class LiveNotificationsModule : Module() {
 
       val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       notificationManager.notify(NOTIFICATION_ID, builder.build())
+      null
     }
 
     Function("endLiveNotification") {
-      val context = appContext.reactContext ?: return@Function
+      val context = appContext.reactContext ?: return@Function null
       val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       notificationManager.cancel(NOTIFICATION_ID)
+      null
     }
   }
 
