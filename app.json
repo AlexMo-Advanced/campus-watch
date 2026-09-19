@@ -40,7 +40,7 @@
         "android.permission.CAMERA"
       ],
       "package": "com.alexmozeyu2011.campuswatch",
-        "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -75,7 +75,6 @@
           "locationAlwaysAndWhenInUsePermission": "CampusWatch needs your location to show where incidents are happening on campus."
         }
       ],
-
       [
         "expo-notifications",
         {
@@ -97,13 +96,6 @@
           "cameraPermission": "CampusWatch needs camera access for instant photo incident reporting.",
           "microphonePermission": false,
           "recordAudioAndroid": false
-        }
-      ],
-      [
-        "react-native-vision-camera",
-        {
-          "cameraPermissionText": "CampusWatch needs camera access for instant photo incident reporting.",
-          "enableMicrophonePermission": false
         }
       ],
       "./plugins/withGradleFixes",
